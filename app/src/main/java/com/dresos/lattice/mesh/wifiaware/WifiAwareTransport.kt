@@ -206,6 +206,13 @@ class WifiAwareTransport(
     @Volatile private var attachGen = 0
     private val reattaching = AtomicBoolean(false)
 
+    // Consecutive onAttachFailed count since the last onAttached / real availability-state flip. Drives the
+    // exponential backoff in rediscoverDelayMs() so an iface-starved device (see ATTACH_RETRY_MAX_MS) backs off
+    // instead of retrying at a fixed 3s cadence forever. Reset to 0 on a successful attach and whenever
+    // ACTION_WIFI_AWARE_STATE_CHANGED reports a genuine flip — either is a real reason to believe a retry might
+    // now succeed.
+    @Volatile private var attachFailStreak = 0
+
     // elapsedRealtime the current attach() called mgr.attach(); lets a later attach() self-heal a stuck
     // [attaching] guard if the framework silently drops an attach (mgr.attach with no onAttached/onAttachFailed).
     @Volatile private var attachStartedAt = 0L
@@ -768,6 +775,7 @@ class WifiAwareTransport(
                             return
                         }
                         session = newSession
+                        attachFailStreak = 0 // a real reason to believe the iface situation has recovered
                         reattaching.set(false) // the reattach that kicked off this (current-gen) attach has settled
                         _health.value = TransportHealth.Healthy
                         startPublish(gen)
@@ -778,7 +786,8 @@ class WifiAwareTransport(
                         attaching.set(false)
                         reattaching.set(false)
                         _health.value = TransportHealth.Degraded
-                        Log.w(TAG, "Wi-Fi Aware attach failed")
+                        attachFailStreak++
+                        Log.w(TAG, "Wi-Fi Aware attach failed (streak=$attachFailStreak)")
                     }
 
                     override fun onAwareSessionTerminated() {
@@ -801,7 +810,8 @@ class WifiAwareTransport(
                 attaching.set(false)
                 reattaching.set(false)
                 _health.value = TransportHealth.Degraded
-                Log.w(TAG, "Wi-Fi Aware attach threw", it)
+                attachFailStreak++
+                Log.w(TAG, "Wi-Fi Aware attach threw (streak=$attachFailStreak)", it)
             }
         }
 
@@ -1269,7 +1279,17 @@ class WifiAwareTransport(
         // transiently false and closing our own session fires no availability broadcast), so recovery falls to
         // the loop's `session == null -> attach()`. Without this, a pure-responder node (nothing sync-wanted to
         // *initiate*) would wait a full REDISCOVER_IDLE_MS with no responder — the 2-minute post-serve wedge.
-        if (session == null) return ATTACH_RETRY_MS
+        if (session == null) {
+            // Bounded exponential backoff: ATTACH_RETRY_MS * 2^streak, capped at ATTACH_RETRY_MAX_MS. A device
+            // that structurally cannot get a NAN iface (e.g. AP+STA already pinning both HAL iface slots — see
+            // WifiAwareTransport class doc) fails every attach() the same way forever; retrying at a fixed
+            // ATTACH_RETRY_MS cadence indefinitely re-registers a fresh AttachCallback with system_server every
+            // few seconds and slowly leaks Binder proxies there until the OS kills this process outright. The
+            // streak resets on a real success or availability flip (see onAttached / availabilityReceiver), so
+            // this only backs off during a genuinely stuck run, not a normal transient failure.
+            val streak = attachFailStreak.coerceAtMost(ATTACH_BACKOFF_SATURATION_STREAK)
+            return (ATTACH_RETRY_MS shl streak).coerceAtMost(ATTACH_RETRY_MAX_MS)
+        }
         // Tick soon while a sync is still owed (a sync-wanted peer we initiate to, maybe backed off / busy)
         // so we retry promptly; hunt aggressively when we know of nobody; otherwise relax (a cue with a new
         // epoch wakes us via healSignal). Doubled when screen-off on battery.
@@ -2110,6 +2130,9 @@ class WifiAwareTransport(
                     // here is the exact race the settle exists to prevent. (Availability broadcasts also lag
                     // many seconds behind the real state on a screen-off device, so this edge is stale anyway.)
                     if (sessionCycleSettleStartedAt != 0L) return
+                    // A real availability flip (e.g. AP/hotspot torn down, freeing the iface slot NAN needs) is
+                    // new information worth resetting the backoff for, even mid-streak.
+                    attachFailStreak = 0
                     attach() // onHandler-funneled; the attaching/session guards make a redundant call a no-op
                 } else {
                     onHandler {
@@ -2254,6 +2277,19 @@ class WifiAwareTransport(
         // Loop cadence while detached (no Aware session): retry attach() promptly so a re-enable that couldn't
         // fire immediately after a reattach teardown recovers in seconds, not a full REDISCOVER_IDLE_MS.
         const val ATTACH_RETRY_MS = 3_000L
+
+        // Ceiling for the exponential backoff below (attachFailStreak). Bounds the retry interval once the
+        // device has clearly been stuck (e.g. its two hardware iface slots are both pinned by AP+STA — a fixed
+        // hotspot/tether configuration Wi-Fi Aware cannot get a third iface out of) instead of hammering
+        // ATTACH_RETRY_MS forever. Each failed mgr.attach() registers a fresh AttachCallback with system_server;
+        // an unbounded fixed-cadence retry against a structurally-unsatisfiable request slowly leaks Binder
+        // proxies there until ActivityManager kills the process for "Too many Binders sent to SYSTEM" — this cap
+        // is what stops that.
+        const val ATTACH_RETRY_MAX_MS = 300_000L // 5 min
+
+        // attachFailStreak count beyond which the backoff is fully saturated at ATTACH_RETRY_MAX_MS (avoids an
+        // unbounded left-shift on a streak that never resets while genuinely iface-starved for a long session).
+        const val ATTACH_BACKOFF_SATURATION_STREAK = 7 // 3s * 2^7 = 384s, already past the 300s ceiling
 
         // Gap after a link/handshake ends before the next requestNetwork, so the framework releases the one
         // NDI first (else "no interfaces available").
