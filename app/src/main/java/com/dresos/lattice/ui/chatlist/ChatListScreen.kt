@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.dresos.lattice.R
 import com.dresos.lattice.mesh.TransportHealth
 import com.dresos.lattice.ui.components.Avatar
@@ -99,7 +100,6 @@ import com.dresos.lattice.ui.preview.KnitPreview
 import com.dresos.lattice.ui.preview.PREVIEW_NOW
 import com.dresos.lattice.ui.util.compactTimeAgo
 import com.dresos.lattice.ui.util.rememberCurrentTimeMillis
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 

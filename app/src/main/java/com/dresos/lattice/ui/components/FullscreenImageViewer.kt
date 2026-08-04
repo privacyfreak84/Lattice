@@ -34,9 +34,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
 import com.dresos.lattice.R
 import com.dresos.lattice.ui.preview.KnitPreview
-import coil3.compose.AsyncImage
 
 /**
  * Fullscreen, pinch-to-zoom/pan viewer for a single image, shown as a black-backdrop [Dialog]. A back

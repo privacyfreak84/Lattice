@@ -1,6 +1,10 @@
 package com.dresos.lattice
 
 import android.app.Application
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.gif.AnimatedImageDecoder
 import com.dresos.lattice.data.blob.BlobDao
 import com.dresos.lattice.di.appModule
 import com.dresos.lattice.di.meshModule
@@ -12,10 +16,6 @@ import com.dresos.lattice.moderation.MlTextModerator
 import com.dresos.lattice.notifications.Notifier
 import com.dresos.lattice.ui.image.BlobFetcher
 import com.dresos.lattice.ui.image.BlobKeyer
-import coil3.ImageLoader
-import coil3.PlatformContext
-import coil3.SingletonImageLoader
-import coil3.gif.AnimatedImageDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

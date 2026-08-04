@@ -1,8 +1,5 @@
 package com.dresos.lattice.ui.image
 
-import com.dresos.lattice.data.blob.BlobDao
-import com.dresos.lattice.mesh.crypto.AttachmentCrypto
-import com.dresos.lattice.mesh.crypto.b64d
 import coil3.ImageLoader
 import coil3.decode.DataSource
 import coil3.decode.ImageSource
@@ -10,6 +7,9 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
 import coil3.request.Options
+import com.dresos.lattice.data.blob.BlobDao
+import com.dresos.lattice.mesh.crypto.AttachmentCrypto
+import com.dresos.lattice.mesh.crypto.b64d
 import okio.Buffer
 
 /**

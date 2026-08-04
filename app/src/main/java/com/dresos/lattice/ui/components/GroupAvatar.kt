@@ -26,9 +26,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.dresos.lattice.ui.image.BlobImage
 import com.dresos.lattice.ui.preview.KnitPreview
-import coil3.compose.AsyncImage
 
 /**
  * A group's circular avatar, shared by the chat header and the group-details screen. Renders the

@@ -148,6 +148,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.dresos.lattice.BuildConfig
 import com.dresos.lattice.R
 import com.dresos.lattice.TextLimits
@@ -170,7 +171,6 @@ import com.dresos.lattice.ui.preview.KnitPreview
 import com.dresos.lattice.ui.preview.PREVIEW_NOW
 import com.dresos.lattice.ui.share.ShareInbox
 import com.dresos.lattice.ui.util.rememberCurrentTimeMillis
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
