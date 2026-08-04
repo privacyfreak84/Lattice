@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "dotagents-standard": {
+      "source": "zaventh/dotagents-standard-skill",
+      "sourceType": "github",
+      "skillPath": "skills/dotagents-standard/SKILL.md",
+      "computedHash": "ec2f35f28b416fc16094c9c22b94fc6a4c178a613317daaec53213eb30fc02a8"
+    },
+    "kotlin-patterns": {
+      "source": "affaan-m/ECC",
+      "sourceType": "github",
+      "skillPath": "skills/kotlin-patterns/SKILL.md",
+      "computedHash": "581e5e74aec1c33ba37209f24f6bca68ba6949d7549ab58c5bc6a75d0fca9d0d"
+    },
+    "material-3": {
+      "source": "hamen/material-3-skill",
+      "sourceType": "github",
+      "skillPath": "skills/material-3/SKILL.md",
+      "computedHash": "72d56347fae33c9b1763e16d0bffb781da382aa3be316b9252dcd35fd050c6bc"
+    }
+  }
+}

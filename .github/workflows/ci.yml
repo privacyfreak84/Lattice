@@ -1,0 +1,63 @@
+name: CI
+
+# Public-mirror CI for github.com/getknit/knit. Mirrors the core jobs of the maintainer's internal
+# .gitlab-ci.yml (build -> test -> verify) so pull requests opened on the GitHub mirror get automated
+# checks. Builds here are UNSIGNED and never touch a signing key — cutting the signed release APK is
+# release.yml's job, triggered by a v* tag. detekt/ktlint are advisory
+# (continue-on-error), matching the GitLab pipeline's allow_failure posture; they are enforced locally
+# by the repo's Git hooks. The *.tflite moderation models are ordinary Git blobs (NOT LFS — see
+# .gitattributes and .agents/context/distribution.md), so a plain checkout is enough; the build's
+# checkModerationModels task hard-fails if one ever arrives as a pointer stub.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace --console=plain
+      - name: JVM unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace --console=plain
+      - name: Upload unit-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+
+  verify:
+    name: detekt & ktlint (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory, mirroring .gitlab-ci.yml allow_failure; enforced locally by Git hooks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: detekt
+        run: ./gradlew detekt --stacktrace --console=plain
+      - name: ktlint
+        run: ./gradlew ktlintCheck --stacktrace --console=plain

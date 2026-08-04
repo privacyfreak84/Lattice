@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only overlay: registers the DebugBridgeReceiver so an automation agent can drive the app
+     over `adb shell am broadcast` (send messages, read state). The manifest merger folds this in for
+     debug variants only, so neither the receiver nor this entry ships in a release build. Exported so
+     the `shell` uid (adb) can deliver to it; debug-only, so an exported custom-action receiver is fine. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <receiver
+            android:name="com.dresos.nexus.debug.DebugBridgeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.dresos.nexus.debug.SEND" />
+                <action android:name="com.dresos.nexus.debug.SENDIMG" />
+                <action android:name="com.dresos.nexus.debug.STATE" />
+                <action android:name="com.dresos.nexus.debug.STORE" />
+                <action android:name="com.dresos.nexus.debug.REACT" />
+                <action android:name="com.dresos.nexus.debug.TYPING" />
+                <action android:name="com.dresos.nexus.debug.SHAREAPK" />
+                <action android:name="com.dresos.nexus.debug.HEAL" />
+                <action android:name="com.dresos.nexus.debug.WEBPPROBE" />
+                <action android:name="com.dresos.nexus.debug.WEBPCONV" />
+                <action android:name="com.dresos.nexus.debug.WEBPCHECK" />
+                <action android:name="com.dresos.nexus.debug.REQNOTIF" />
+                <action android:name="com.dresos.nexus.debug.FLAGMSG" />
+                <action android:name="com.dresos.nexus.debug.REVIEW" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

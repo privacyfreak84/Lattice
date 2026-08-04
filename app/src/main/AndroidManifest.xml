@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Mesh transport plane 1: Wi-Fi Aware (NAN). On API 33+ discovery is location-free via
+         NEARBY_WIFI_DEVICES (neverForLocation); on API 29-32 there is no such permission, so Wi-Fi Aware
+         discovery needs ACCESS_FINE_LOCATION (declared below, shared with the BLE scan and capped to 32). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Discovery on API 29-32: Wi-Fi Aware (no NEARBY_WIFI_DEVICES before 33) and the BLE scan (no
+         neverForLocation before 31) both require fine location. Android 12 requires COARSE to be declared and
+         requested alongside FINE (the precise/approximate toggle). Both capped at 32 so API 33+ is location-free. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="32" />
+
+    <!-- Data path (NDP): request the Aware network and open a TCP socket over its link-local IPv6. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Wi-Fi Aware is a hardware feature; required=false so the app still installs on devices without
+         it (they surface an "unsupported" state at runtime rather than being filtered off the store). -->
+    <uses-feature android:name="android.hardware.wifi.aware" android:required="false" />
+
+    <!-- Mesh transport plane 2: Bluetooth LE (advertise/scan for discovery + presence/RSSI, L2CAP CoC for
+         the data socket). On API 31+ the split BLUETOOTH_SCAN/ADVERTISE/CONNECT apply, and neverForLocation
+         on BLUETOOTH_SCAN keeps the scan location-free (identity is the nodeId, RSSI is proximity-only). On
+         API 29-30 those don't exist: legacy BLUETOOTH/BLUETOOTH_ADMIN (normal, auto-granted) drive the radio
+         and the scan rides ACCESS_FINE_LOCATION (declared above). The legacy pair is capped at 30 so 31+ uses
+         only the split perms. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- QR identity verification (scan a peer's key) — CameraX + zxing core, see ui/scan/. required=false
+         because a camera-less device can still *show* its own code for someone else to scan; the scanner
+         surfaces an explanatory message instead (QrScanner probes FEATURE_CAMERA_ANY at runtime). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <!-- Always-on mesh foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Restart the mesh foreground service after a device reboot (see .mesh.BootReceiver). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:name=".KnitApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Knit">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Knit"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- System share sheet: receive text or a single image from another app (ACTION_SEND).
+                 The grant ride-along on EXTRA_STREAM lets us read the image via ContentResolver with
+                 no storage permission. singleTask re-delivers shares to onNewIntent when running. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".mesh.MeshService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- Restart the always-on mesh after a device reboot, unless the user manually stopped it
+             (mesh_enabled=false). BOOT_COMPLETED is delivered post-unlock, so the credential-encrypted
+             settings DataStore is readable, and its receipt is an exemption to the background
+             foreground-service-start restrictions; connectedDevice is a boot-permitted FGS type.
+             exported=true because the system delivers this from outside the app; BOOT_COMPLETED is a
+             protected broadcast that only the system can send. -->
+        <receiver
+            android:name=".mesh.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Message-notification quick actions (inline Reply, Mark read) + swipe-away dismiss. Not exported:
+             only the system delivers these PendingIntents (Reply rides a MUTABLE one carrying RemoteInput). -->
+        <receiver
+            android:name=".notifications.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!-- Hands our own APK to the system share sheet (Quick Share / Bluetooth) so a user can pass
+             Knit to a nearby phone offline. Outbound only; the receiver's OS installs it. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

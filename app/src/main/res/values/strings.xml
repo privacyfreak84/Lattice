@@ -1,0 +1,321 @@
+<resources>
+    <string name="app_name">Dres Nexus</string>
+
+    <!-- Notification channel groups -->
+    <string name="notif_group_messages">Messages</string>
+    <string name="notif_group_app">App</string>
+
+    <!-- Mesh foreground service (App group) -->
+    <string name="mesh_channel_name">Mesh networking</string>
+    <string name="channel_status_desc">Keeps the mesh running while the app is in the background</string>
+    <string name="mesh_notification_title">Knit mesh is active</string>
+    <string name="mesh_notification_searching">Mesh is active and searching</string>
+    <plurals name="mesh_notification_connected">
+        <item quantity="one">Connected to %d nearby device</item>
+        <item quantity="other">Connected to %d nearby devices</item>
+    </plurals>
+    <string name="mesh_notification_stop">Stop</string>
+
+    <!-- Connection &amp; error alerts (App group) -->
+    <string name="channel_alerts_name">Connection &amp; alerts</string>
+    <string name="channel_alerts_desc">Mesh connection changes and errors</string>
+
+    <!-- Message channels (Messages group) -->
+    <string name="channel_nearby_name">Nearby</string>
+    <string name="channel_nearby_desc">Messages in the public Nearby room</string>
+    <string name="channel_groups_name">Group messages</string>
+    <string name="channel_groups_desc">Messages in your group chats</string>
+    <string name="channel_dms_name">Direct messages</string>
+    <string name="channel_dms_desc">Private 1:1 messages</string>
+    <string name="mention_channel_name">Mentions</string>
+    <string name="mention_channel_description">Notifications when someone @-mentions you</string>
+
+    <!-- Notification conversation titles (per channel) -->
+    <string name="notif_title_nearby">Nearby</string>
+    <string name="notif_title_groups">Group messages</string>
+    <string name="notif_title_dms">Direct messages</string>
+    <string name="notif_title_mentions">Mentions</string>
+    <string name="notif_self_name">You</string>
+
+    <!-- Notification quick actions + group summary (Signal-style) -->
+    <string name="notif_action_reply">Reply</string>
+    <string name="notif_reply_hint">Message</string>
+    <string name="notif_action_mark_read">Mark read</string>
+    <string name="notif_summary">%1$d messages in %2$d chats</string>
+
+    <!-- Message requests (coalesced heads-up) -->
+    <string name="channel_requests_name">Message requests</string>
+    <string name="channel_requests_desc">Alerts you when someone new messages you</string>
+    <string name="notif_requests_title">Message request received</string>
+    <plurals name="notif_requests_body">
+        <item quantity="one">%d message request</item>
+        <item quantity="other">%d message requests</item>
+    </plurals>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Welcome to Knit</string>
+    <string name="onboarding_blurb">Knit connects directly to nearby phones over Wi-Fi Aware to relay encrypted messages — no internet, no servers. It needs the nearby-devices permission to find peers, and works best when allowed to run in the background.</string>
+    <string name="onboarding_grant_permissions">Grant permissions</string>
+    <string name="onboarding_permissions_granted">Permissions granted</string>
+    <string name="onboarding_unsupported">This device doesn\'t support Wi-Fi Aware, so it can\'t join the mesh. You can still open the app, but it won\'t connect to nearby phones.</string>
+    <string name="onboarding_start">Start meshing</string>
+
+    <!-- Chat -->
+    <string name="chat_more_options">More options</string>
+    <string name="chat_connection_none">No mesh nodes connected</string>
+    <plurals name="chat_connection_count">
+        <item quantity="one">Connected to %d mesh node</item>
+        <item quantity="other">Connected to %d mesh nodes</item>
+    </plurals>
+    <string name="chat_connection_radio_off">Turn on Wi-Fi or Bluetooth to connect</string>
+    <string name="chat_connection_airplane">Airplane mode is on — turn on Wi-Fi or Bluetooth</string>
+    <string name="chat_connection_degraded">Mesh radio unavailable — another app may be using it</string>
+    <!-- Chat-list radio-off banner -->
+    <string name="chatlist_radio_banner_bluetooth_off">Bluetooth is off — tap to turn it on for better range and reliability</string>
+    <string name="chatlist_radio_banner_wifi_off">Wi-Fi is off — tap to turn it on for faster, longer-range mesh</string>
+    <string name="chatlist_radio_banner_all_off">Knit can\'t connect — turn on Wi-Fi or Bluetooth to reach people nearby</string>
+    <string name="chatlist_radio_banner_all_off_airplane">Airplane mode is on — turn it off or turn on Wi-Fi/Bluetooth to connect</string>
+    <string name="chatlist_radio_banner_dismiss">Dismiss</string>
+    <string name="chat_empty">No messages yet.\nSay hello to nearby devices.</string>
+    <string name="chat_message_hint">Knit Message</string>
+    <string name="chat_typing">%1$s is typing</string>
+    <string name="chat_typing_multiple">%1$s and others are typing</string>
+    <string name="chat_loading_photo">Photo appears when a nearby device has it</string>
+    <string name="chat_sending">Sending…</string>
+    <string name="chat_attachment_image_desc">Photo attachment</string>
+    <string name="chat_view_photo">View photo</string>
+    <string name="chat_image_viewer_desc">Photo</string>
+    <string name="chat_image_saved">Saved to Pictures/Knit</string>
+    <string name="chat_image_save_failed">Couldn\'t save image</string>
+    <string name="chat_attachment_preview_desc">Attachment preview</string>
+    <string name="chat_remove_attachment">Remove attachment</string>
+    <string name="chat_self_name">You</string>
+    <string name="chat_status_sent">Sent</string>
+    <string name="chat_status_delivered">Delivered</string>
+    <string name="chat_time_just_now">Just now</string>
+    <string name="chat_action_copy">Copy text</string>
+    <string name="chat_action_reply">Reply</string>
+    <string name="chat_reply_photo">📷 Photo</string>
+    <string name="chat_reply_cancel">Cancel reply</string>
+    <string name="chat_message_copied">Copied to clipboard</string>
+    <string name="chat_action_delete">Delete message</string>
+    <string name="chat_message_deleted">Message deleted</string>
+    <string name="chat_delete_confirm_title">Delete message?</string>
+    <string name="chat_delete_confirm_body">It will be removed from this device only.</string>
+    <string name="chat_delete_confirm_action">Delete</string>
+    <string name="chat_list_delete_action">Delete</string>
+    <string name="chat_list_delete_confirm_title">Delete chat?</string>
+    <string name="chat_list_delete_confirm_body">All messages in this chat will be removed from this device only.</string>
+    <string name="chat_action_block">Block user</string>
+    <string name="chat_action_unblock">Unblock user</string>
+    <string name="chat_view_profile">View %1$s\'s profile</string>
+    <string name="chat_view_group_info">View group info</string>
+    <string name="chat_group_settings">Settings</string>
+    <string name="chat_react_with">React with %1$s</string>
+    <plurals name="chat_reaction_count">
+        <item quantity="one">%2$s, %1$d reaction</item>
+        <item quantity="other">%2$s, %1$d reactions</item>
+    </plurals>
+    <string name="chat_user_blocked">User blocked</string>
+    <string name="chat_user_unblocked">User unblocked</string>
+
+    <!-- Group chat -->
+    <string name="group_unnamed">Group</string>
+    <plurals name="chat_group_member_count">
+        <item quantity="one">%d member</item>
+        <item quantity="other">%d members</item>
+    </plurals>
+    <string name="chat_group_rename">Rename group</string>
+    <string name="chat_group_set_photo">Set group photo</string>
+    <string name="chat_group_name_label">Group name</string>
+    <string name="chat_group_rename_action">Rename</string>
+    <string name="chat_group_leave">Leave group</string>
+    <string name="chat_group_leave_confirm_title">Leave group?</string>
+    <string name="chat_group_leave_confirm_body">You\'ll stop receiving messages and this chat will be removed from this device.</string>
+    <string name="chat_group_leave_confirm_action">Leave</string>
+    <string name="chat_group_member_left">%1$s left the chat</string>
+    <string name="group_details_title">Group info</string>
+    <string name="group_details_members">Members</string>
+    <string name="group_details_view_photo">View photo</string>
+    <string name="blocked_users_title">Blocked users</string>
+    <string name="blocked_users_empty">No blocked users</string>
+    <string name="blocked_users_unblock">Unblock</string>
+
+    <!-- Message requests -->
+    <string name="message_requests_title">Message requests</string>
+    <string name="message_requests_empty">No message requests</string>
+    <string name="message_requests_accept">Accept</string>
+    <string name="message_requests_block">Block</string>
+    <string name="message_requests_block_confirm_title">Block this person?</string>
+    <string name="message_requests_block_confirm_body">You won\'t receive messages from them, and this request is removed.</string>
+    <string name="message_requests_delete_confirm_title">Delete request?</string>
+    <string name="message_requests_delete_confirm_body">This conversation will be removed from this device only.</string>
+
+    <!-- Donate -->
+    <string name="donate_title">Support Knit</string>
+    <string name="donate_blurb">Knit is free and funded entirely by tips — no ads, no servers, no tracking. If it\'s useful to you, a small donation helps keep development going.</string>
+    <string name="donate_kofi">Ko-fi</string>
+    <string name="donate_liberapay">Liberapay</string>
+
+    <!-- Install offline (offline APK share) -->
+    <string name="share_app_menu">Install offline</string>
+    <string name="share_app_dialog_title">Install offline</string>
+    <string name="share_app_dialog_body">Send Knit to a nearby phone, even with no internet. Pick Quick Share or Bluetooth next. On the other phone, open the received file and allow installing it to finish.</string>
+    <string name="share_app_dialog_confirm">Share</string>
+    <string name="share_app_chooser_title">Install offline</string>
+    <!-- Shown while a Play (App Bundle / split) install is merged into one shareable APK — several seconds. -->
+    <string name="share_app_preparing">Preparing Knit to share…</string>
+    <string name="share_app_error">Couldn\'t share the app</string>
+    <string name="share_app_error_storage">Not enough free space to prepare Knit to share.</string>
+
+    <!-- Share Knit (Play Store link) -->
+    <string name="share_knit_menu">Share Knit</string>
+    <string name="share_knit_chooser_title">Share Knit</string>
+    <!-- %1$s = Play Store URL -->
+    <string name="share_knit_text">Knit is a free, offline mesh messenger — no servers, no accounts, no internet needed. Get it: %1$s</string>
+
+    <!-- Rate / review prompt -->
+    <string name="review_prompt_title">Enjoying Knit?</string>
+    <string name="review_prompt_body">You\'ve been meshing for a while now — how\'s it going?</string>
+    <string name="review_prompt_positive">Yes!</string>
+    <string name="review_prompt_negative">Not really</string>
+    <string name="review_menu">Rate Knit</string>
+
+    <!-- Share sheet target picker -->
+    <string name="share_target_title">Share to…</string>
+
+    <!-- Direct messages / contacts -->
+    <string name="contacts_title">New message</string>
+    <string name="contacts_new_message">New message</string>
+    <string name="contacts_empty">No contacts yet.\nSay hi in Nearby, or use Verify contact to add someone by code.</string>
+    <string name="contacts_start_chat">Start chat</string>
+    <string name="contacts_selected">Selected</string>
+    <string name="contacts_not_selected">Not selected</string>
+    <string name="contacts_group_full">Groups can have up to %1$d people</string>
+
+    <!-- Chat list -->
+    <string name="nearby_title">Nearby</string>
+    <string name="chat_list_empty_preview">No messages yet</string>
+    <string name="chat_list_preview_photo">📷 Photo</string>
+    <string name="chat_list_preview_with_sender">%1$s: %2$s</string>
+    <plurals name="chat_list_unread_count">
+        <item quantity="one">%d unread message</item>
+        <item quantity="other">%d unread messages</item>
+    </plurals>
+
+    <!-- Profile -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_display_name_label">Display name</string>
+    <string name="profile_status_label">Status</string>
+    <string name="profile_node_id">Node ID: %1$s</string>
+    <string name="battery_allowed">Background battery use: allowed</string>
+    <string name="battery_restricted">Background battery use: restricted — the mesh may drop when idle</string>
+    <string name="battery_allow_button">Allow background battery use</string>
+    <string name="profile_avatar_crop_hint">Drag and pinch to adjust</string>
+    <string name="profile_avatar_crop_desc">Adjust profile photo</string>
+    <string name="profile_change_photo_desc">Change profile photo</string>
+    <string name="profile_remove_photo_desc">Remove profile photo</string>
+    <string name="settings_content_filtering_title">Content filtering</string>
+    <string name="settings_content_filtering_subtitle">Hide explicit images and abusive messages you receive from others</string>
+
+    <!-- Profile details (another peer) -->
+    <string name="profile_details_title">Profile</string>
+    <string name="profile_details_message">Message</string>
+    <string name="profile_details_online">Online</string>
+    <string name="profile_details_offline">Offline</string>
+    <string name="profile_details_view_photo">View photo</string>
+
+    <!-- Encryption indicator in the chat header -->
+    <string name="chat_encrypted_desc">Encrypted</string>
+    <string name="chat_encryption_info_title">End-to-end encrypted</string>
+    <string name="chat_encryption_info_body">Messages in this chat are end-to-end encrypted — only the people in this conversation can read them.</string>
+
+    <!-- E2E key verification -->
+    <string name="verify_section_title">Encryption</string>
+    <string name="verify_verified">Verified</string>
+    <string name="verify_not_verified">Not verified</string>
+    <string name="verify_no_key">Encryption keys haven\'t been exchanged with this contact yet.</string>
+    <string name="verify_safety_number">Safety number</string>
+    <string name="verify_caption">Compare this number with %1$s in person, or scan their code, to confirm no one is intercepting your messages.</string>
+    <string name="verify_qr_caption">Let %1$s scan this code</string>
+    <string name="verify_scan">Scan their code</string>
+    <string name="verify_mark_verified">Mark as verified</string>
+    <string name="verify_clear">Clear verification</string>
+    <string name="verify_match">Verified — keys match.</string>
+    <string name="verify_mismatch">Codes don\'t match. This may not be the right contact.</string>
+
+    <!-- Standalone "Verify contact" screen (chat-list overflow) -->
+    <string name="verify_contact_title">Verify contact</string>
+    <string name="verify_standalone_caption">Show your code to someone nearby, or scan theirs, to add them as a verified contact — even if you\'ve never chatted.</string>
+    <string name="verify_qr_caption_generic">Let them scan this code</string>
+    <string name="verify_added">Verified — added to your contacts.</string>
+    <string name="verify_self">That\'s your own code.</string>
+    <string name="verify_invalid">That\'s not a Knit contact code.</string>
+
+    <!-- QR scanner (camera) -->
+    <string name="scan_hint">Point the camera at the other person\'s code.</string>
+    <string name="scan_permission_denied">Knit needs camera access to scan a contact\'s code. You can turn it on in Settings.</string>
+    <string name="scan_open_settings">Open settings</string>
+    <string name="scan_no_camera">This device has no camera, so codes can\'t be scanned. You can still show your own code for someone else to scan.</string>
+    <string name="scan_camera_unavailable">The camera couldn\'t be opened. Close any other app using it and try again.</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_self">This device</string>
+    <string name="diagnostics_metrics">Mesh metrics</string>
+    <string name="diagnostics_directly_connected">Directly connected (%1$d)</string>
+    <string name="diagnostics_via_relay">Reachable via relay (%1$d)</string>
+    <string name="diagnostics_none_direct">No direct connections</string>
+    <string name="diagnostics_none_relay">No relay-only nodes</string>
+    <string name="diagnostics_profile_age">Profile %1$s</string>
+    <string name="diagnostics_metric_originated">Originated</string>
+    <string name="diagnostics_metric_delivered">Delivered</string>
+    <string name="diagnostics_metric_relayed">Relayed</string>
+    <string name="diagnostics_metric_suppressed">Suppressed</string>
+    <string name="diagnostics_metric_deduped">Deduped</string>
+    <string name="diagnostics_metric_bytes_sent">Bytes sent</string>
+    <string name="diagnostics_metric_dropped">Dropped</string>
+    <string name="diagnostics_metric_key_requests">Key requests sent</string>
+    <string name="diagnostics_metric_keys_served">Keys served</string>
+    <string name="diagnostics_metric_keys_recovered">Keys recovered</string>
+    <string name="diagnostics_metric_frames_held">Frames held for key</string>
+    <string name="diagnostics_metric_frames_replayed">Frames replayed</string>
+    <string name="diagnostics_metric_receipts_resent">Receipts re-sent</string>
+    <string name="diagnostics_metric_bt_connect_fails">BT connect failures</string>
+    <string name="diagnostics_controls">Mesh controls</string>
+    <string name="diagnostics_status_healthy">Mesh status: Healthy</string>
+    <string name="diagnostics_status_degraded">Mesh status: Degraded</string>
+    <string name="diagnostics_status_degraded_hint">The radio may be in use by another app like Quick Share. Tap Restart mesh if it doesn\'t recover on its own.</string>
+    <string name="diagnostics_status_unavailable">Mesh status: Radios off</string>
+    <string name="diagnostics_status_unavailable_hint">Wi-Fi and Bluetooth are both off (or airplane mode is on). Turn one on to join the mesh.</string>
+    <string name="diagnostics_restart_mesh">Restart mesh</string>
+    <string name="diagnostics_scan_now">Scan for nearby devices</string>
+    <string name="diagnostics_mesh_restarted">Mesh restarted</string>
+    <string name="diagnostics_scanning">Scanning for nearby devices…</string>
+    <string name="diagnostics_transports">Transports</string>
+    <string name="diagnostics_none_transports">No active transports</string>
+    <string name="diagnostics_transport_bluetooth">Bluetooth</string>
+    <string name="diagnostics_transport_wifi_aware">Wi-Fi Aware</string>
+    <string name="diagnostics_transport_other">Other</string>
+    <string name="diagnostics_transport_counts">%1$d nearby · %2$d linked</string>
+    <string name="diagnostics_tag_ble">BLE</string>
+    <string name="diagnostics_tag_nan">NAN</string>
+    <string name="diagnostics_transport_audio">audio</string>
+
+    <!-- Generic actions / content descriptions -->
+    <string name="action_send">Send</string>
+    <string name="action_attach_photo">Attach photo</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+
+    <!-- Content moderation (on-device) -->
+    <string name="moderation_text_blocked">Message not sent: it may contain abusive language</string>
+    <string name="moderation_text_hidden">Message hidden — tap to reveal</string>
+    <string name="moderation_image_blocked">Explicit images can\'t be sent to the Nearby room</string>
+    <string name="moderation_image_confirm_title">Send explicit image?</string>
+    <string name="moderation_image_confirm_body">This image may contain explicit content. Pleasure ensure the recipient wants to receive this kind of content.</string>
+    <string name="moderation_image_confirm_send">Send anyway</string>
+    <string name="moderation_image_hidden">Sensitive image — tap to view</string>
+</resources>
