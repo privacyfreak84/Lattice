@@ -1,6 +1,6 @@
 <div align="center">
 
-# Dres Nexus
+# Lattice
 
 **A transport-agnostic secure comms platform for Android — carrier SMS/calling *and* an offline
 mesh (Wi-Fi Aware + BLE), one end-to-end encrypted protocol regardless of which one carries the

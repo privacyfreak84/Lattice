@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Dres Nexus</string>
+    <string name="app_name">Lattice</string>
 
     <!-- Notification channel groups -->
     <string name="notif_group_messages">Messages</string>

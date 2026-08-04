@@ -1,6 +1,6 @@
 # NOTICE
 
-Dres Nexus is a combined work licensed as a whole under the **GNU General Public License v3.0 or
+Lattice is a combined work licensed as a whole under the **GNU General Public License v3.0 or
 later** (see [`COPYING`](COPYING)). It is derived from two upstream projects:
 
 ## Knit

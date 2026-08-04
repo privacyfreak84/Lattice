@@ -7,23 +7,23 @@
 
     <application>
         <receiver
-            android:name="com.dresos.nexus.debug.DebugBridgeReceiver"
+            android:name="com.dresos.lattice.debug.DebugBridgeReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.dresos.nexus.debug.SEND" />
-                <action android:name="com.dresos.nexus.debug.SENDIMG" />
-                <action android:name="com.dresos.nexus.debug.STATE" />
-                <action android:name="com.dresos.nexus.debug.STORE" />
-                <action android:name="com.dresos.nexus.debug.REACT" />
-                <action android:name="com.dresos.nexus.debug.TYPING" />
-                <action android:name="com.dresos.nexus.debug.SHAREAPK" />
-                <action android:name="com.dresos.nexus.debug.HEAL" />
-                <action android:name="com.dresos.nexus.debug.WEBPPROBE" />
-                <action android:name="com.dresos.nexus.debug.WEBPCONV" />
-                <action android:name="com.dresos.nexus.debug.WEBPCHECK" />
-                <action android:name="com.dresos.nexus.debug.REQNOTIF" />
-                <action android:name="com.dresos.nexus.debug.FLAGMSG" />
-                <action android:name="com.dresos.nexus.debug.REVIEW" />
+                <action android:name="com.dresos.lattice.debug.SEND" />
+                <action android:name="com.dresos.lattice.debug.SENDIMG" />
+                <action android:name="com.dresos.lattice.debug.STATE" />
+                <action android:name="com.dresos.lattice.debug.STORE" />
+                <action android:name="com.dresos.lattice.debug.REACT" />
+                <action android:name="com.dresos.lattice.debug.TYPING" />
+                <action android:name="com.dresos.lattice.debug.SHAREAPK" />
+                <action android:name="com.dresos.lattice.debug.HEAL" />
+                <action android:name="com.dresos.lattice.debug.WEBPPROBE" />
+                <action android:name="com.dresos.lattice.debug.WEBPCONV" />
+                <action android:name="com.dresos.lattice.debug.WEBPCHECK" />
+                <action android:name="com.dresos.lattice.debug.REQNOTIF" />
+                <action android:name="com.dresos.lattice.debug.FLAGMSG" />
+                <action android:name="com.dresos.lattice.debug.REVIEW" />
             </intent-filter>
         </receiver>
     </application>

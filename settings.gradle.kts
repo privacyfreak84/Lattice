@@ -28,5 +28,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DresNexus"
+rootProject.name = "Lattice"
 include(":app")
