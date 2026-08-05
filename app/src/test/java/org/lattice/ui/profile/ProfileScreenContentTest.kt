@@ -29,6 +29,7 @@ class ProfileScreenContentTest {
             alias = "Cool Fox",
             avatarHash = null,
             contentFilteringEnabled = true,
+            appLockEnabled = true,
             isDirty = isDirty,
         )
 
@@ -47,6 +48,7 @@ class ProfileScreenContentTest {
                     onStatusChange = {},
                     onStatusCommit = {},
                     onToggleContentFiltering = {},
+                    onToggleAppLock = {},
                     onPickPhoto = {},
                     onClearPhoto = {},
                     onAllowBattery = {},
