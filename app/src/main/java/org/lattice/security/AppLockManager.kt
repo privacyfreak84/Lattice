@@ -3,7 +3,10 @@ package org.lattice.security
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Log
 import java.io.File
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -22,6 +25,7 @@ import javax.crypto.spec.GCMParameterSpec
  * (e.g. the user added or removed a fingerprint) instead of getting stuck locked out.
  */
 object AppLockManager {
+    private const val TAG = "AppLockManager"
     private const val KEY_ALIAS = "lattice_unlock_key"
     private const val TOKEN_FILE = "applock.bin"
     private const val TRANSFORM = "AES/GCM/NoPadding"
@@ -76,7 +80,16 @@ object AppLockManager {
         try {
             val (_, ct) = readToken(ctx)
             cipher.doFinal(ct).contentEquals(MARKER)
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
+            // Wrong key, tampered/corrupted ciphertext, or a bad auth tag -- this *is* "not a valid
+            // unlock", not a bug, but still worth a log line if it ever needs investigating.
+            Log.w(TAG, "verifyUnlock: cipher rejected the sealed token", e)
+            false
+        } catch (e: IOException) {
+            Log.w(TAG, "verifyUnlock: could not read the sealed token file", e)
+            false
+        } catch (e: IndexOutOfBoundsException) {
+            Log.w(TAG, "verifyUnlock: sealed token file is truncated/corrupted", e)
             false
         }
 

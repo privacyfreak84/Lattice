@@ -1,6 +1,7 @@
 package org.lattice.ui.applock
 
 import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.util.Log
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -34,7 +35,11 @@ import org.koin.compose.koinInject
 import org.lattice.R
 import org.lattice.data.settings.SettingsStore
 import org.lattice.security.AppLockManager
+import java.io.IOException
+import java.security.GeneralSecurityException
 import javax.crypto.Cipher
+
+private const val TAG = "AppLockGate"
 
 private enum class LockState { CHECKING, LOCKED, UNLOCKED }
 
@@ -164,8 +169,16 @@ private fun cryptoUnlock(
         try {
             if (enrolling) AppLockManager.newEncryptCipher() else AppLockManager.newDecryptCipher(activity)
         } catch (e: KeyPermanentlyInvalidatedException) {
+            Log.w(TAG, "cryptoUnlock: key invalidated (e.g. biometric enrollment changed), re-enrolling", e)
             reEnrollOrFallBack(activity, onResult) ?: return
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
+            Log.w(TAG, "cryptoUnlock: could not mint a cipher, re-enrolling", e)
+            reEnrollOrFallBack(activity, onResult) ?: return
+        } catch (e: IOException) {
+            Log.w(TAG, "cryptoUnlock: could not read the sealed token, re-enrolling", e)
+            reEnrollOrFallBack(activity, onResult) ?: return
+        } catch (e: IndexOutOfBoundsException) {
+            Log.w(TAG, "cryptoUnlock: sealed token file is truncated/corrupted, re-enrolling", e)
             reEnrollOrFallBack(activity, onResult) ?: return
         }
     val reEnrolling = enrolling || !AppLockManager.isEnrolled(activity)
@@ -185,7 +198,11 @@ private fun cryptoUnlock(
                             } else {
                                 AppLockManager.verifyUnlock(activity, c)
                             }
-                        } catch (e: Exception) {
+                        } catch (e: GeneralSecurityException) {
+                            Log.w(TAG, "onAuthenticationSucceeded: enroll cipher rejected the marker", e)
+                            false
+                        } catch (e: IOException) {
+                            Log.w(TAG, "onAuthenticationSucceeded: could not write the sealed token", e)
                             false
                         }
                     onResult(ok)
@@ -228,7 +245,12 @@ private fun reEnrollOrFallBack(
     AppLockManager.reset(activity)
     return try {
         AppLockManager.newEncryptCipher()
-    } catch (e: Exception) {
+    } catch (e: GeneralSecurityException) {
+        Log.w(TAG, "reEnrollOrFallBack: fresh cipher still failed, falling back to device credential", e)
+        credentialUnlock(activity, onResult)
+        null
+    } catch (e: IOException) {
+        Log.w(TAG, "reEnrollOrFallBack: keystore I/O failed, falling back to device credential", e)
         credentialUnlock(activity, onResult)
         null
     }
