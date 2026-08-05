@@ -3,7 +3,9 @@ name: CI
 # Public-mirror CI for github.com/getknit/knit. Mirrors the core jobs of the maintainer's internal
 # .gitlab-ci.yml (build -> test -> verify) so pull requests opened on the GitHub mirror get automated
 # checks. Builds here are UNSIGNED and never touch a signing key — cutting the signed release APK is
-# release.yml's job, triggered by a v* tag. detekt/ktlint are advisory
+# release.yml's job, triggered by a v* tag. Every run of build-test also uploads the assembled debug
+# APK as a workflow artifact (see the Upload debug APK step) so any push/PR has a sideloadable build
+# without waiting for a tagged release. detekt/ktlint are advisory
 # (continue-on-error), matching the GitLab pipeline's allow_failure posture; they are enforced locally
 # by the repo's Git hooks. The *.tflite moderation models are ordinary Git blobs (NOT LFS — see
 # .gitattributes and .agents/context/distribution.md), so a plain checkout is enough; the build's
@@ -35,6 +37,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --console=plain
+      - name: Upload debug APK
+        # Deliberately not gated on the unit-test step below it -- assembleDebug already succeeded by
+        # this point, so the APK is real and worth having even if a later step in this job fails. This
+        # is the day-to-day sideload artifact; release.yml's signed/reproducible build is the separate,
+        # deliberate "cut a real release" path (tag-triggered), not something every push should produce.
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
       - name: JVM unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace --console=plain
       - name: Upload unit-test report
