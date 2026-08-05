@@ -3,18 +3,21 @@ package com.dresos.lattice
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
+import androidx.fragment.app.FragmentActivity
 import com.dresos.lattice.ui.KnitApp
 import com.dresos.lattice.ui.RouteInbox
+import com.dresos.lattice.ui.applock.AppLockGate
 import com.dresos.lattice.ui.share.ShareInbox
 import com.dresos.lattice.ui.share.SharedContent
 import com.dresos.lattice.ui.theme.KnitTheme
 import org.koin.android.ext.android.inject
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (not plain ComponentActivity) because AppLockGate's BiometricPrompt requires one —
+// setContent is still available, it's a ComponentActivity extension and FragmentActivity extends it.
+class MainActivity : FragmentActivity() {
     // Single-shot holder for content arriving via the system share sheet; KnitApp/ChatScreen drain it.
     private val shareInbox: ShareInbox by inject()
 
@@ -40,7 +43,9 @@ class MainActivity : ComponentActivity() {
             }
         setContent {
             KnitTheme {
-                KnitApp(startRoute = startRoute)
+                AppLockGate {
+                    KnitApp(startRoute = startRoute)
+                }
             }
         }
     }

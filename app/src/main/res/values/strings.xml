@@ -217,6 +217,12 @@
     <string name="profile_remove_photo_desc">Remove profile photo</string>
     <string name="settings_content_filtering_title">Content filtering</string>
     <string name="settings_content_filtering_subtitle">Hide explicit images and abusive messages you receive from others</string>
+    <string name="settings_app_lock_title">App lock</string>
+    <string name="settings_app_lock_subtitle">Require biometric or device unlock to open Lattice</string>
+    <string name="applock_title">Lattice is locked</string>
+    <string name="applock_subtitle">Authenticate to continue</string>
+    <string name="applock_unlock_action">Unlock</string>
+    <string name="applock_failed">Unlock failed</string>
 
     <!-- Profile details (another peer) -->
     <string name="profile_details_title">Profile</string>

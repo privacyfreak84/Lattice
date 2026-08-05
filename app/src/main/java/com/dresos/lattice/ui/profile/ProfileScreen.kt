@@ -83,6 +83,7 @@ internal data class ProfileFormState(
     val alias: String,
     val avatarHash: String?,
     val contentFilteringEnabled: Boolean,
+    val appLockEnabled: Boolean,
     val isDirty: Boolean,
 )
 
@@ -98,6 +99,7 @@ fun ProfileScreen(
     val avatarHash by viewModel.avatarHash.collectAsStateWithLifecycle()
     val cropTarget by viewModel.cropTarget.collectAsStateWithLifecycle()
     val contentFilteringEnabled by viewModel.contentFilteringEnabled.collectAsStateWithLifecycle()
+    val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val isDirty by viewModel.isDirty.collectAsStateWithLifecycle()
 
     // Navigate back only once Save has finished persisting (the write outlives this composition because
@@ -130,6 +132,7 @@ fun ProfileScreen(
                 alias = alias,
                 avatarHash = avatarHash,
                 contentFilteringEnabled = contentFilteringEnabled,
+                appLockEnabled = appLockEnabled,
                 isDirty = isDirty,
             ),
         batteryExempt = rememberBatteryExempt(),
@@ -139,6 +142,7 @@ fun ProfileScreen(
         onStatusChange = viewModel::setStatus,
         onStatusCommit = viewModel::commitStatus,
         onToggleContentFiltering = viewModel::setContentFilteringEnabled,
+        onToggleAppLock = viewModel::setAppLockEnabled,
         onPickPhoto = {
             picker.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -161,6 +165,7 @@ internal fun ProfileScreenContent(
     onStatusChange: (String) -> Unit,
     onStatusCommit: () -> Unit,
     onToggleContentFiltering: (Boolean) -> Unit,
+    onToggleAppLock: (Boolean) -> Unit,
     onPickPhoto: () -> Unit,
     onClearPhoto: () -> Unit,
     onAllowBattery: () -> Unit,
@@ -241,6 +246,11 @@ internal fun ProfileScreenContent(
             ContentFilteringRow(
                 enabled = form.contentFilteringEnabled,
                 onToggle = onToggleContentFiltering,
+            )
+
+            AppLockRow(
+                enabled = form.appLockEnabled,
+                onToggle = onToggleAppLock,
             )
 
             BatteryOptimizationRow(exempt = batteryExempt, onAllow = onAllowBattery)
@@ -342,6 +352,39 @@ private fun ContentFilteringRow(
 }
 
 /**
+ * Toggle for App Lock — a biometric/device-credential prompt gating app entry (see
+ * [com.dresos.lattice.ui.applock.AppLockGate]). Mirrors [ContentFilteringRow]'s structure exactly.
+ */
+@Composable
+private fun AppLockRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .toggleable(value = enabled, onValueChange = onToggle, role = Role.Switch)
+                .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_app_lock_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.settings_app_lock_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+/**
  * Whether the app is currently exempt from battery optimization, refreshed on every screen resume.
  * Lives in the stateful wrapper (not [BatteryOptimizationRow]) because the `PowerManager` read is not
  * available to the preview renderer.
@@ -437,6 +480,7 @@ fun ProfileScreenPreview() =
                     alias = "Rustling Rabbit",
                     avatarHash = null,
                     contentFilteringEnabled = true,
+                    appLockEnabled = true,
                     isDirty = true,
                 ),
             batteryExempt = false,
@@ -446,6 +490,7 @@ fun ProfileScreenPreview() =
             onStatusChange = {},
             onStatusCommit = {},
             onToggleContentFiltering = {},
+            onToggleAppLock = {},
             onPickPhoto = {},
             onClearPhoto = {},
             onAllowBattery = {},
@@ -467,6 +512,7 @@ fun ProfileScreenNewUserPreview() =
                     alias = "Rustling Rabbit",
                     avatarHash = null,
                     contentFilteringEnabled = true,
+                    appLockEnabled = true,
                     isDirty = false,
                 ),
             batteryExempt = true,
@@ -476,6 +522,7 @@ fun ProfileScreenNewUserPreview() =
             onStatusChange = {},
             onStatusCommit = {},
             onToggleContentFiltering = {},
+            onToggleAppLock = {},
             onPickPhoto = {},
             onClearPhoto = {},
             onAllowBattery = {},

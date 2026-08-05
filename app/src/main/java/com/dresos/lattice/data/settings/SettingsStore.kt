@@ -96,6 +96,14 @@ class SettingsStore(
         dataStore.data.map { it[KEY_CONTENT_FILTERING] ?: true }
 
     /**
+     * Whether app entry is gated behind biometric/device-credential unlock (see
+     * [com.dresos.lattice.security.AppLockManager] and [com.dresos.lattice.ui.applock.AppLockGate]).
+     * Defaults to on — the vault contains message content, so unlock-by-default matches the rest of
+     * this app's "secure by default, opt out if you want" posture rather than "opt in to safety".
+     */
+    val appLockEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_APP_LOCK] ?: true }
+
+    /**
      * Whether the mesh foreground service should be running — the persisted twin of "is the mesh on".
      * Defaults to on. Flipped to false when the user manually stops the service from its ongoing
      * notification, and back to true whenever the service (re)starts, so [com.dresos.lattice.mesh.BootReceiver]
@@ -173,6 +181,8 @@ class SettingsStore(
 
     suspend fun setContentFilteringEnabled(value: Boolean) = dataStore.edit { it[KEY_CONTENT_FILTERING] = value }
 
+    suspend fun setAppLockEnabled(value: Boolean) = dataStore.edit { it[KEY_APP_LOCK] = value }
+
     suspend fun setMeshEnabled(value: Boolean) = dataStore.edit { it[KEY_MESH_ENABLED] = value }
 
     suspend fun setReviewEngagementStartedAt(value: Long) = dataStore.edit { it[KEY_REVIEW_ENGAGEMENT_STARTED_AT] = value }
@@ -207,6 +217,7 @@ class SettingsStore(
         val KEY_BLOCKED_TAGS = stringSetPreferencesKey("blocked_device_tags")
         val KEY_ACCEPTED = stringSetPreferencesKey("accepted_conversations")
         val KEY_CONTENT_FILTERING = booleanPreferencesKey("content_filtering_enabled")
+        val KEY_APP_LOCK = booleanPreferencesKey("app_lock_enabled")
         val KEY_MESH_ENABLED = booleanPreferencesKey("mesh_enabled")
         val KEY_REVIEW_ENGAGEMENT_STARTED_AT = longPreferencesKey("review_engagement_started_at")
         val KEY_REVIEW_LAST_ATTEMPT_AT = longPreferencesKey("review_last_attempt_at")

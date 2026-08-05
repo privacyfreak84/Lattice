@@ -77,6 +77,14 @@ class ProfileViewModel(
         settings.contentFilteringEnabled
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
+    /**
+     * Whether App Lock (biometric/device-credential gate on app entry) is enabled. See
+     * [com.dresos.lattice.security.AppLockManager].
+     */
+    val appLockEnabled: StateFlow<Boolean> =
+        settings.appLockEnabled
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     init {
         viewModelScope.launch {
             val id = identity.nodeId()
@@ -136,6 +144,10 @@ class ProfileViewModel(
 
     fun setContentFilteringEnabled(value: Boolean) {
         viewModelScope.launch { settings.setContentFilteringEnabled(value) }
+    }
+
+    fun setAppLockEnabled(value: Boolean) {
+        viewModelScope.launch { settings.setAppLockEnabled(value) }
     }
 
     // The picked image awaiting crop. Held here (not in SavedStateHandle — a Bitmap is large and not

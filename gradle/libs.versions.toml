@@ -126,10 +126,17 @@ uiautomator = "2.3.0"
 # the format support and bug fixes the platform class only gains with each OS release, which matters on
 # minSdk 29 for the HEIC/RAW files a modern camera hands us through the picker.
 exifinterface = "1.4.2"
+# androidx Biometric — App Lock's BiometricPrompt (fingerprint/face, falling back to device
+# credential). 1.1.0 is the last full-stable release; 1.2.0 has been alpha-only for years, so this is
+# deliberately not "latest". BiometricPrompt's constructor requires a FragmentActivity (or Fragment) —
+# not a plain ComponentActivity — which is why MainActivity extends FragmentActivity; fragment-ktx
+# comes in transitively via this artifact's POM, no separate pin needed.
+biometric = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
