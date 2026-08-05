@@ -3,15 +3,15 @@
 package org.lattice.demo
 
 import android.util.Log
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import org.koin.core.Koin
 import org.lattice.BuildConfig
 import org.lattice.data.message.Conversations
 import org.lattice.identity.Identity
 import org.lattice.mesh.MeshManager
 import org.lattice.mesh.Peer
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
-import org.koin.core.Koin
 
 /**
  * Debug-only trailer director (`-PdemoDirector=true`). Plays a scripted, animated conversation on the

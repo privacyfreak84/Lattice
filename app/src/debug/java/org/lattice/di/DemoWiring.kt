@@ -1,17 +1,17 @@
 package org.lattice.di
 
-import org.lattice.BuildConfig
-import org.lattice.demo.DemoDirector
-import org.lattice.demo.DemoSeeder
-import org.lattice.mesh.DemoTransport
-import org.lattice.mesh.MeshTransport
-import org.lattice.mesh.Peer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.koin.core.Koin
+import org.lattice.BuildConfig
+import org.lattice.demo.DemoDirector
+import org.lattice.demo.DemoSeeder
+import org.lattice.mesh.DemoTransport
+import org.lattice.mesh.MeshTransport
+import org.lattice.mesh.Peer
 
 /**
  * Debug-variant demo wiring. Two debug-only modes swap in the no-op [DemoTransport] and seed the DB, and

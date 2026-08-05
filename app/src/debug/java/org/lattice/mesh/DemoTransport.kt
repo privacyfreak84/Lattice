@@ -1,10 +1,10 @@
 package org.lattice.mesh
 
-import org.lattice.mesh.protocol.WireEnvelope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import org.lattice.mesh.protocol.WireEnvelope
 import java.io.File
 
 /**

@@ -1,10 +1,10 @@
 package org.lattice.demo
 
 import android.util.Log
+import org.koin.core.Koin
 import org.lattice.BuildConfig
 import org.lattice.identity.Identity
 import org.lattice.mesh.MeshManager
-import org.koin.core.Koin
 
 /**
  * Populates the database with a believable conversation history so the app renders fully on an

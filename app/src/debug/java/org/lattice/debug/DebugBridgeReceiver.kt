@@ -12,6 +12,13 @@ import android.graphics.drawable.AnimatedImageDrawable
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import org.lattice.data.AttachmentStore
 import org.lattice.data.GroupRepository
 import org.lattice.data.MessageRepository
@@ -40,13 +47,6 @@ import org.lattice.review.ReviewPromptPolicy
 import org.lattice.review.ReviewPrompter
 import org.lattice.ui.chat.buildReplySnippet
 import org.lattice.ui.invite.prepareKnitApk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer

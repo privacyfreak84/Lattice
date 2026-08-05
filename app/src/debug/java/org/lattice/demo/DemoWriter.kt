@@ -3,6 +3,7 @@
 package org.lattice.demo
 
 import android.content.Context
+import org.koin.core.Koin
 import org.lattice.data.BlobRepository
 import org.lattice.data.GroupRepository
 import org.lattice.data.MessageRepository
@@ -19,7 +20,6 @@ import org.lattice.data.reaction.ReactionEntity
 import org.lattice.data.settings.SettingsStore
 import org.lattice.mesh.protocol.Mention
 import org.lattice.mesh.protocol.ReplyRef
-import org.koin.core.Koin
 import java.security.MessageDigest
 
 /**

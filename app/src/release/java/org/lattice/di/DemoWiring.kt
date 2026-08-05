@@ -1,7 +1,7 @@
 package org.lattice.di
 
-import org.lattice.mesh.MeshTransport
 import org.koin.core.Koin
+import org.lattice.mesh.MeshTransport
 
 /**
  * Release-variant demo wiring — no-ops. Demo-screenshot mode is a debug-only affordance, so the seeder
