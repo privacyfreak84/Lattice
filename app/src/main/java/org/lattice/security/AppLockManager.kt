@@ -86,10 +86,8 @@ object AppLockManager {
             Log.w(TAG, "verifyUnlock: cipher rejected the sealed token", e)
             false
         } catch (e: IOException) {
+            // Covers both a genuine read failure and readToken's own corruption check.
             Log.w(TAG, "verifyUnlock: could not read the sealed token file", e)
-            false
-        } catch (e: IndexOutOfBoundsException) {
-            Log.w(TAG, "verifyUnlock: sealed token file is truncated/corrupted", e)
             false
         }
 
@@ -110,7 +108,12 @@ object AppLockManager {
 
     private fun readToken(ctx: Context): Pair<ByteArray, ByteArray> {
         val all = tokenFile(ctx).readBytes()
+        // IOException, not an unchecked index exception, for a corrupted/truncated file -- callers
+        // already catch IOException for "the sealed token couldn't be read" and this is the same case;
+        // it just means the read succeeded but produced garbage instead of failing outright.
+        if (all.isEmpty()) throw IOException("Sealed token file is empty")
         val n = all[0].toInt()
+        if (n < 0 || 1 + n > all.size) throw IOException("Sealed token file is truncated (ivSize=$n, total=${all.size})")
         return all.copyOfRange(1, 1 + n) to all.copyOfRange(1 + n, all.size)
     }
 }

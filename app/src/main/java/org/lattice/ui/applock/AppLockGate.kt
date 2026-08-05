@@ -175,10 +175,8 @@ private fun cryptoUnlock(
             Log.w(TAG, "cryptoUnlock: could not mint a cipher, re-enrolling", e)
             reEnrollOrFallBack(activity, onResult) ?: return
         } catch (e: IOException) {
+            // Covers both a genuine read failure and AppLockManager.readToken's own corruption check.
             Log.w(TAG, "cryptoUnlock: could not read the sealed token, re-enrolling", e)
-            reEnrollOrFallBack(activity, onResult) ?: return
-        } catch (e: IndexOutOfBoundsException) {
-            Log.w(TAG, "cryptoUnlock: sealed token file is truncated/corrupted, re-enrolling", e)
             reEnrollOrFallBack(activity, onResult) ?: return
         }
     val reEnrolling = enrolling || !AppLockManager.isEnrolled(activity)
