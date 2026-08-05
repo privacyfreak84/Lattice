@@ -7,23 +7,23 @@
 
     <application>
         <receiver
-            android:name="com.dresos.lattice.debug.DebugBridgeReceiver"
+            android:name="org.lattice.debug.DebugBridgeReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.dresos.lattice.debug.SEND" />
-                <action android:name="com.dresos.lattice.debug.SENDIMG" />
-                <action android:name="com.dresos.lattice.debug.STATE" />
-                <action android:name="com.dresos.lattice.debug.STORE" />
-                <action android:name="com.dresos.lattice.debug.REACT" />
-                <action android:name="com.dresos.lattice.debug.TYPING" />
-                <action android:name="com.dresos.lattice.debug.SHAREAPK" />
-                <action android:name="com.dresos.lattice.debug.HEAL" />
-                <action android:name="com.dresos.lattice.debug.WEBPPROBE" />
-                <action android:name="com.dresos.lattice.debug.WEBPCONV" />
-                <action android:name="com.dresos.lattice.debug.WEBPCHECK" />
-                <action android:name="com.dresos.lattice.debug.REQNOTIF" />
-                <action android:name="com.dresos.lattice.debug.FLAGMSG" />
-                <action android:name="com.dresos.lattice.debug.REVIEW" />
+                <action android:name="org.lattice.debug.SEND" />
+                <action android:name="org.lattice.debug.SENDIMG" />
+                <action android:name="org.lattice.debug.STATE" />
+                <action android:name="org.lattice.debug.STORE" />
+                <action android:name="org.lattice.debug.REACT" />
+                <action android:name="org.lattice.debug.TYPING" />
+                <action android:name="org.lattice.debug.SHAREAPK" />
+                <action android:name="org.lattice.debug.HEAL" />
+                <action android:name="org.lattice.debug.WEBPPROBE" />
+                <action android:name="org.lattice.debug.WEBPCONV" />
+                <action android:name="org.lattice.debug.WEBPCHECK" />
+                <action android:name="org.lattice.debug.REQNOTIF" />
+                <action android:name="org.lattice.debug.FLAGMSG" />
+                <action android:name="org.lattice.debug.REVIEW" />
             </intent-filter>
         </receiver>
     </application>

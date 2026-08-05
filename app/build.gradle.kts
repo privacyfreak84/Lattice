@@ -53,7 +53,7 @@ fun releaseSigningCred(
 val nativeSymbols = (project.findProperty("knit.nativeSymbols") as? String)?.toBoolean() == true
 
 android {
-    namespace = "com.dresos.lattice"
+    namespace = "org.lattice"
     compileSdk {
         version =
             release(36) {
@@ -74,7 +74,7 @@ android {
     if (nativeSymbols) ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.dresos.lattice"
+        applicationId = "org.lattice"
         // minSdk 29 is the shared data-path floor: BLE L2CAP CoC and the Wi-Fi Aware NDP
         // (WifiAwareNetworkSpecifier.Builder) are both API 29. Both radios run on 29+. Wi-Fi Aware uses
         // Instant Communication Mode + NEARBY_WIFI_DEVICES on 33+ and ACCESS_FINE_LOCATION (no ICM) on 29-32;
@@ -236,7 +236,7 @@ android {
         unitTests {
             // Robolectric runs the JVM Room/DAO + migration tests (finding #5): it reads AGP's merged
             // manifest/resources config and supplies a Context + framework SQLite so in-memory Room
-            // executes the real eviction/GC SQL. See app/src/test/java/com/dresos/lattice/data/ and
+            // executes the real eviction/GC SQL. See app/src/test/java/org/lattice/data/ and
             // app/src/test/resources/robolectric.properties.
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
@@ -255,10 +255,10 @@ android {
                     apiLevel = 33
                     systemImageSource = "aosp-atd"
                 }
-                // Headless emulator for the accessibility suite (com.dresos.lattice.a11y): the Compose ATF
+                // Headless emulator for the accessibility suite (org.lattice.a11y): the Compose ATF
                 // checks are @RequiresApi(34), so they need an API-34+ device — pixel7api33 is too old and
                 // just skips them (@SdkSuppress). Run: `./gradlew :app:pixel8api34DebugAndroidTest
-                // -PseedDemo=true -Pandroid.testInstrumentationRunnerArguments.package=com.dresos.lattice.a11y`.
+                // -PseedDemo=true -Pandroid.testInstrumentationRunnerArguments.package=org.lattice.a11y`.
                 // aosp-atd (headless, GMS-stripped) is fine — ATF is a pure library; fall back to "aosp" if
                 // the ATD image isn't published for 34.
                 create("pixel8api34") {
@@ -342,7 +342,7 @@ tasks.named("preBuild") { dependsOn(checkModerationModels) }
 room {
     // Export the Room schema JSON via the Room Gradle plugin (replaces the raw ksp `room.schemaLocation`
     // arg — the plugin rejects that arg if also set). With only build types (no product flavors) it writes
-    // the flat schemas/com.dresos.lattice.data.LatticeDatabase/<version>.json — same layout the ksp arg produced —
+    // the flat schemas/org.lattice.data.LatticeDatabase/<version>.json — same layout the ksp arg produced —
     // which the debug sourceSet below serves as a unit-test asset so MigrationTestHelper can read it.
     // Requires exportSchema = true on LatticeDatabase; regenerate the checked-in schema by clearing app/schemas/
     // and rebuilding after any @Database version bump (KSP incremental caching can otherwise skip re-export).
@@ -476,7 +476,7 @@ dependencies {
     // JVM Room/DAO + migration tests (finding #5): Robolectric supplies a Context + framework SQLite so
     // in-memory Room runs the real eviction/GC SQL, and room-testing's MigrationTestHelper rebuilds the
     // exported schema on that same shadowed SQLite (via androidx.sqlite's AndroidSQLiteDriver, already pulled
-    // by Room). See app/src/test/java/com/dresos/lattice/data/.
+    // by Room). See app/src/test/java/org/lattice/data/.
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.junit) // AndroidJUnit4 runner on the JVM (delegated by Robolectric)
     testImplementation(libs.androidx.test.core) // ApplicationProvider.getApplicationContext()
@@ -489,7 +489,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     // Accessibility Test Framework (ATF) checks in the Compose suite — the same framework the Play
     // pre-launch report runs. Pulls ATF + AccessibilityValidator transitively; drives the API-34+
-    // a11y package (com.dresos.lattice.a11y, @RequiresApi(34)). See .agents/context/testing.md.
+    // a11y package (org.lattice.a11y, @RequiresApi(34)). See .agents/context/testing.md.
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
@@ -501,7 +501,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.services.storage) // TestStorage: FTL-collected screenshots
-    // UIAutomator black-box suite (com.dresos.lattice.uiauto): drives the real app process via resource-ids
+    // UIAutomator black-box suite (org.lattice.uiauto): drives the real app process via resource-ids
     // (testTagsAsResourceId) + the system UI (notification shade, Recents). See .agents/context/testing.md.
     androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestUtil(libs.androidx.test.orchestrator)
