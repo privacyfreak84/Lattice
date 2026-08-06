@@ -52,7 +52,9 @@ class LatticeDatabaseMigrationTest {
     @Test
     fun `migrate 1 to 2 preserves peer rows and adds a nullable phoneNumber column`() {
         helper.createDatabase(1).use { c ->
-            c.execSQL("INSERT INTO peers (nodeId, name, status, verified, updatedAt) VALUES ('n1','Ann','',0,0)")
+            c
+                .prepare("INSERT INTO peers (nodeId, name, status, verified, updatedAt) VALUES ('n1','Ann','',0,0)")
+                .use { it.step() }
         }
         helper.runMigrationsAndValidate(2, listOf(KnitMigrations.MIGRATION_1_2)).use { c ->
             // The pre-existing row survived the migration, and its new column defaulted to NULL
@@ -63,7 +65,7 @@ class LatticeDatabaseMigrationTest {
                 assertTrue(s.isNull(1))
             }
             // The column actually accepts and round-trips a real value for a newly-attached peer.
-            c.execSQL("UPDATE peers SET phoneNumber = '+15551234567' WHERE nodeId = 'n1'")
+            c.prepare("UPDATE peers SET phoneNumber = '+15551234567' WHERE nodeId = 'n1'").use { it.step() }
             c.prepare("SELECT phoneNumber FROM peers WHERE nodeId = 'n1'").use { s ->
                 assertTrue(s.step())
                 assertEquals("+15551234567", s.getText(0))

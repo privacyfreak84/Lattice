@@ -2,7 +2,6 @@ package org.lattice.data
 
 import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
-import androidx.sqlite.execSQL
 
 /**
  * The registry of tested schema migrations applied in [LatticeDatabase.build].
@@ -22,7 +21,11 @@ object KnitMigrations {
     val MIGRATION_1_2: Migration =
         object : Migration(1, 2) {
             override fun migrate(connection: SQLiteConnection) {
-                connection.execSQL("ALTER TABLE peers ADD COLUMN phoneNumber TEXT")
+                // prepare().use { it.step() }, not execSQL: androidx.sqlite has no bare execSQL extension on
+                // SQLiteConnection in the version this project pins (a prior attempt at that failed to
+                // compile -- "Unresolved reference"). prepare()/step() is the primitive already proven to
+                // work against this exact SQLiteConnection type in LatticeDatabaseMigrationTest.
+                connection.prepare("ALTER TABLE peers ADD COLUMN phoneNumber TEXT").use { it.step() }
             }
         }
 
