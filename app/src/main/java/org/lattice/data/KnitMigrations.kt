@@ -1,6 +1,8 @@
 package org.lattice.data
 
 import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 
 /**
  * The registry of tested schema migrations applied in [LatticeDatabase.build].
@@ -10,20 +12,20 @@ import androidx.room.migration.Migration
  * `LatticeDatabaseMigrationTest`) instead of silently wiping user data. So this is the single place production
  * migrations live: keep it in lockstep with `@Database(version = …)` and the checked-in
  * `app/schemas/**/<version>.json`.
- *
- * Empty at launch. The first migration (`MIGRATION_1_2`) lands with the first post-launch schema change; use
- * the driver-based `migrate(SQLiteConnection)` override (matching the `LatticeDatabaseMigrationTest` harness), e.g.:
- *
- * ```
- * val MIGRATION_1_2 = object : Migration(1, 2) {
- *     override fun migrate(connection: androidx.sqlite.SQLiteConnection) {
- *         connection.execSQL("ALTER TABLE peers ADD COLUMN nickname TEXT")
- *     }
- * }
- * ```
- * then add it to [ALL] and fill in the migration test template.
  */
 object KnitMigrations {
-    /** All migrations, applied by Room in order. Empty until the first post-v1 schema change. */
-    val ALL: Array<Migration> = arrayOf()
+    /**
+     * Adds `peers.phoneNumber` (nullable TEXT, no default needed since it's nullable) — the SMS/MMS
+     * carrier-transport addressing field; see [org.lattice.data.peer.PeerEntity]. Every existing row gets
+     * `NULL` ("mesh-only"), which is exactly the right value for a peer nobody has attached a number to yet.
+     */
+    val MIGRATION_1_2: Migration =
+        object : Migration(1, 2) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE peers ADD COLUMN phoneNumber TEXT")
+            }
+        }
+
+    /** All migrations, applied by Room in order. */
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
 }

@@ -22,6 +22,13 @@ import androidx.room.PrimaryKey
  * [protoVersion]/[capabilities] are the peer's advertised protocol version and feature bits (see
  * [org.lattice.mesh.protocol.Protocol]), learned (authenticated) from their profile frame; null
  * until a profile carrying them arrives. Recorded for diagnostics; not yet consumed for routing.
+ *
+ * [phoneNumber] is the peer's number for the SMS/MMS carrier transport (E.164, e.g. `+15551234567`),
+ * set only when the local user has explicitly attached one — nothing populates it from mesh discovery,
+ * since a nodeId carries no phone number and one should never be inferred. Null means "mesh-only": that
+ * transport has no route to this peer and skips it. Unlike [pubKey], attaching or changing a number is
+ * not itself a trust event; the existing [verified] flag (safety number / QR, tied to [pubKey]) is what
+ * carries authentication, and continues to gate it regardless of which transport a message rides.
  */
 @Entity(tableName = "peers")
 data class PeerEntity(
@@ -35,4 +42,5 @@ data class PeerEntity(
     val protoVersion: Int? = null,
     val capabilities: Long? = null,
     val updatedAt: Long = 0L,
+    val phoneNumber: String? = null,
 )
