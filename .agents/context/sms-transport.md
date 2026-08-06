@@ -58,27 +58,61 @@ skips a peer with no number the same way any transport skips a peer it can't rea
   safety-number verification. Is a phone-number-only contact (never met over mesh, no `pubKey` yet)
   supported at all, and if so, how does the *first* message — which needs to carry or negotiate a public
   key before anything can be E2E-encrypted — fit inside an SMS payload and stay believable as
-  "attacker-resistant" rather than a trust-on-first-use downgrade from what mesh already does? This is
-  probably the single biggest design decision left.
-- **Wire size.** A `WireEnvelope` (signature + envelope + ciphertext) is sized for a mesh frame or a
-  Wi-Fi Aware message (~255 B), not a 140-byte SMS segment. Concatenated (multipart) SMS raises the
-  practical ceiling to roughly 1300 B across ~10 segments, which may or may not fit a signed envelope
-  depending on message length — needs a real measurement, not an assumption, before deciding whether
-  everything routes through MMS instead, or short text stays SMS and anything larger (including all
-  attachments) is MMS-only.
-- **No discovery, no presence.** There's no equivalent of "peer is nearby" for a phone number — a
-  `SmsTransport` peer is either "has a number attached" or not, permanently, until removed. `health`
-  probably just reflects whether `SEND_SMS`/`RECEIVE_SMS` permissions are granted and a SIM is present,
-  not anything dynamic.
-- **Default SMS app.** Some of what a full SMS integration wants (reliably intercepting incoming
-  messages, sending without a system dialog) may require Android's default-SMS-app role, which is a much
-  bigger ask (an app claiming that role must also handle plain/unencrypted SMS from non-Lattice numbers,
-  MMS UI, etc.) than just holding `SEND_SMS`/`RECEIVE_SMS` permissions. Needs an explicit decision, not a
-  default fallen into.
-- **Dres's `ContactsStore.kt`** (the encrypted contacts vault) was on the original port list and never
-  got an explicit port/drop call. Worth resolving alongside this, since it's contact data specifically
-  for the carrier path.
+  "attacker-resistant" rather than a trust-on-first-use downgrade from what mesh already does? Still open;
+  `SmsTransport` (batch 2) only ever surfaces peers that already have both a `phoneNumber` and a pinned
+  `pubKey`, same trust model as every other transport — an SMS-only contact simply isn't representable yet.
+- **MMS / large payloads.** Still open. `SmsTransport.sendFile` always returns `false` in batch 2 — see the
+  wire-size measurement below for why a single-recipient DM fits SMS but attachments and larger group
+  messages don't.
+- **Default SMS app.** Decided for now (batch 2): **not claimed.** `SmsTransport` registers only a dynamic
+  `BroadcastReceiver` for `SMS_RECEIVED_ACTION`, which any app holding `RECEIVE_SMS` gets regardless of
+  default-app status. This is the smaller ask and enough for send/receive of Lattice's own traffic; it does
+  *not* get us reliable interception ahead of the real default SMS app, or the ability to suppress the
+  system "message sent" UI chrome. Revisit if that turns out to matter in practice.
+- **Dres's `ContactsStore.kt`** — still unresolved, not touched by batch 2.
+- **Phone number normalization.** `SmsTransport.onSmsReceived` matches an inbound SMS's `originatingAddress`
+  against the stored `phoneNumber` with an exact string comparison — no E.164 normalization. A correctly
+  configured peer whose carrier delivers a differently-formatted address (spacing, missing/extra country
+  code) will silently fail to match. Needs a real normalization scheme, tested against actual carrier
+  behavior, not a guessed one.
+
+## Wire-size measurement (resolved, batch 2)
+
+Couldn't get a compiled measurement in this sandbox (no Maven/Google repo access for
+`kotlinx-serialization-cbor`, same constraint as the rest of the build) — this is a hand-computed estimate
+from the actual field shapes in `Wire.kt` / `MessageCrypto.kt`, not a golden-vector run. Worth re-deriving
+from a real `WireCodec.encodeWire()` call once this can build for real.
+
+For a short single-recipient DM ("Hey, see you at 6"):
+- `EncEnvelope`: `nonce` (12 B) + `ct` (~30 B plaintext + 16 B GCM tag ≈ 46 B) + one `WrappedKey`
+  (`to` nodeId ~44–66 B + Tink hybrid-wrapped 32 B content key ≈ 100–140 B) + CBOR map overhead ≈ **~250 B**.
+- `RelayEnvelope` wrapping it (`type`, `id`, `senderId`, `sentAt`, `recipientId`, the payload above, map
+  overhead) ≈ **~410 B**.
+- `WireEnvelope` wrapping *that* (`ttl`/`hops`/`relay`, 64 B Ed25519 `sig`, the `signed` bytes above) ≈
+  **~495 B**.
+
+Base64'd for SMS transport (`SmsWireCodec.encode`), ~495 B → ~660 chars. At the GSM-7 concatenated budget
+(153 chars/part, `SmsWireCodec.GSM7_CONCAT_PART_CHARS`) that's **5 parts** — comfortably inside the ~10-part
+practical ceiling this doc flagged as needing a real number.
+
+The number that doesn't scale well: every additional group recipient adds one more `WrappedKey`
+(~100–140 B) to the payload. A 3-recipient group message is already pushing 7–8 parts; a 5+ recipient group
+message will blow past the ceiling. Decision for this batch: `SmsTransport` doesn't special-case this —
+`send()` just encodes and calls `SmsManager.divideMessage`/`sendMultipartTextMessage`, so an oversized
+message degrades to "many SMS parts" rather than failing outright, but a real group-size cutoff (route to
+MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
 
 ## Batch log
 
-- **Batch 1** (this): `PeerEntity.phoneNumber` + `MIGRATION_1_2`. Schema only — no transport code yet.
+- **Batch 1**: `PeerEntity.phoneNumber` + `MIGRATION_1_2`. Schema only — no transport code yet.
+- **Batch 2** (this): `SmsTransport` (`mesh/sms/SmsTransport.kt`) implementing `MeshTransport` per the
+  "implement the interface anyway" decision above — text-only, addressed to peers with both `phoneNumber`
+  and a pinned `pubKey`. `SmsWireCodec` (`mesh/sms/SmsWireCodec.kt`) is the pure-logic base64 framing +
+  part-count estimator, unit-tested on the JVM. Wired into `CompositeMeshTransport` last (lowest
+  send-preference, after both radio planes) in `di/MeshModule.kt`, gated on `FEATURE_TELEPHONY` at
+  construction and self-degrading to `Unavailable` health at runtime if `SEND_SMS`/`RECEIVE_SMS` aren't
+  granted or there's no SIM. Added `PeerDao.observeWithPhoneNumber()` / `PeerRepository.observeWithPhoneNumber()`
+  as the routing-table source. Manifest: `SEND_SMS`, `RECEIVE_SMS`, `android.hardware.telephony`
+  (`required=false`). Not done: MMS/`sendFile` (always `false`), `SmsReceiver` UI/permission-request flow
+  (the transport registers its own dynamic receiver, but nothing yet prompts the user for the two
+  permissions), `CallManager`, the encrypted contacts vault. All still open per the list above.

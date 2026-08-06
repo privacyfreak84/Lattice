@@ -46,4 +46,11 @@ interface PeerDao {
 
     @Upsert
     suspend fun upsert(peer: PeerEntity)
+
+    /**
+     * Peers with a phone number attached — [org.lattice.mesh.sms.SmsTransport]'s entire routing table
+     * (see [PeerEntity.phoneNumber]: null means mesh-only, so those peers are never candidates here).
+     */
+    @Query("SELECT * FROM peers WHERE phoneNumber IS NOT NULL")
+    fun observeWithPhoneNumber(): Flow<List<PeerEntity>>
 }

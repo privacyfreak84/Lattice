@@ -19,6 +19,7 @@ import org.lattice.mesh.crypto.MessageCrypto
 import org.lattice.mesh.meshExceptionHandler
 import org.lattice.mesh.power.PowerMonitor
 import org.lattice.mesh.power.PowerStateSource
+import org.lattice.mesh.sms.SmsTransport
 import org.lattice.mesh.wifiaware.WifiAwareTransport
 import java.io.File
 
@@ -57,6 +58,13 @@ val meshModule =
                         // clear the @RequiresApi companion/constructor calls on this pre-31-reachable line.
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && WifiAwareTransport.isSupported(ctx)) {
                             add(WifiAwareTransport(ctx, get(), get(), get(), get(), get()))
+                        }
+                        // Carrier fallback, lowest send-preference (both radio planes beat it when available —
+                        // SMS is the "nothing else works" path). Gated on telephony hardware only; the transport
+                        // self-degrades to Unavailable at runtime if SEND_SMS/RECEIVE_SMS aren't granted or there's
+                        // no SIM, same pattern as the radio transports self-degrading on a missing permission.
+                        if (SmsTransport.isSupported(ctx)) {
+                            add(SmsTransport(ctx, get(), get()))
                         }
                     }
                 CompositeMeshTransport(children, get(), get()) { msg ->

@@ -11,6 +11,9 @@ class PeerRepository(
 ) {
     fun observePeers(): Flow<List<PeerEntity>> = dao.observeAll()
 
+    /** Peers reachable over the SMS/MMS carrier transport — see [org.lattice.mesh.sms.SmsTransport]. */
+    fun observeWithPhoneNumber(): Flow<List<PeerEntity>> = dao.observeWithPhoneNumber()
+
     fun observe(nodeId: String): Flow<PeerEntity?> = dao.observeByNodeId(nodeId)
 
     suspend fun find(nodeId: String): PeerEntity? = dao.findByNodeId(nodeId)
