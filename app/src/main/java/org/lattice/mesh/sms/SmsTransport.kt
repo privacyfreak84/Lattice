@@ -170,7 +170,11 @@ class SmsTransport(
                 ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECEIVE_SMS) ==
                 PackageManager.PERMISSION_GRANTED
         val hasSim = telephonyManager?.simState == TelephonyManager.SIM_STATE_READY
-        return if (hasPermissions && hasSim && smsManager != null) TransportHealth.Healthy else TransportHealth.Unavailable
+        return if (hasPermissions && hasSim && smsManager != null) {
+            TransportHealth.Healthy
+        } else {
+            TransportHealth.Unavailable
+        }
     }
 
     companion object {
@@ -181,6 +185,8 @@ class SmsTransport(
         fun isSupported(context: Context): Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
 
         @Suppress("DEPRECATION") // Telephony.Sms.Intents.getMessagesFromIntent requires API 34-only overload otherwise
-        private fun getMessagesFromIntent(intent: Intent) = android.provider.Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        private fun getMessagesFromIntent(intent: Intent) =
+            android.provider.Telephony.Sms.Intents
+                .getMessagesFromIntent(intent)
     }
 }
