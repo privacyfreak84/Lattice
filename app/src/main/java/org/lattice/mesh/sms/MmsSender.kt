@@ -48,7 +48,7 @@ object MmsSender {
         val messageId = insertMessageRow(resolver, attachment != null) ?: return false
         insertAddrRow(resolver, messageId, toPhoneNumber)
         insertParts(resolver, messageId, wireBytes, attachment)
-        return sendPdu(context, resolver, messageId)
+        return sendPdu(context, messageId)
     }
 
     private fun insertMessageRow(
@@ -106,7 +106,6 @@ object MmsSender {
 
     private fun sendPdu(
         context: Context,
-        resolver: ContentResolver,
         messageId: Long,
     ): Boolean {
         val messageUri = ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, messageId)

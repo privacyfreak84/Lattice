@@ -61,7 +61,9 @@ object MmsWsp {
         var contentLocation: String? = null
         var failed = false
 
-        while (!failed && cursor.hasNext() && (transactionId == null || contentLocation == null)) {
+        fun haveBothFields() = transactionId != null && contentLocation != null
+
+        while (!failed && cursor.hasNext() && !haveBothFields()) {
             when (val outcome = readField(cursor)) {
                 is FieldOutcome.MessageType -> messageType = outcome.value
                 is FieldOutcome.TransactionId -> transactionId = outcome.value
@@ -99,31 +101,33 @@ object MmsWsp {
 
     private fun readField(cursor: Cursor): FieldOutcome {
         val field = cursor.nextByte() ?: return FieldOutcome.Failed
-        return when (field) {
-            FIELD_MESSAGE_TYPE -> {
-                val value = cursor.nextByte() ?: return FieldOutcome.Failed
-                FieldOutcome.MessageType((value and SHORT_INTEGER_VALUE_MASK) or SHORT_INTEGER_TOP_BIT)
-            }
+        val outcome: FieldOutcome? =
+            when (field) {
+                FIELD_MESSAGE_TYPE -> {
+                    cursor.nextByte()?.let { value ->
+                        FieldOutcome.MessageType((value and SHORT_INTEGER_VALUE_MASK) or SHORT_INTEGER_TOP_BIT)
+                    }
+                }
 
-            FIELD_MMS_VERSION -> {
-                cursor.nextByte() ?: return FieldOutcome.Failed
-                FieldOutcome.Skip
-            }
+                FIELD_MMS_VERSION -> {
+                    cursor.nextByte()?.let { FieldOutcome.Skip }
+                }
 
-            FIELD_TRANSACTION_ID -> {
-                FieldOutcome.TransactionId(cursor.readTextString() ?: return FieldOutcome.Failed)
-            }
+                FIELD_TRANSACTION_ID -> {
+                    cursor.readTextString()?.let { FieldOutcome.TransactionId(it) }
+                }
 
-            FIELD_CONTENT_LOCATION -> {
-                FieldOutcome.ContentLocation(cursor.readTextString() ?: return FieldOutcome.Failed)
-            }
+                FIELD_CONTENT_LOCATION -> {
+                    cursor.readTextString()?.let { FieldOutcome.ContentLocation(it) }
+                }
 
-            // A field type this parser doesn't know how to skip safely — see class doc. Fail closed rather
-            // than guess a length and risk misreading the rest of the PDU.
-            else -> {
-                FieldOutcome.Failed
+                // A field type this parser doesn't know how to skip safely — see class doc. Fail closed
+                // rather than guess a length and risk misreading the rest of the PDU.
+                else -> {
+                    null
+                }
             }
-        }
+        return outcome ?: FieldOutcome.Failed
     }
 
     /** Tiny byte-cursor over [pdu] — the only place offset bookkeeping happens. */
