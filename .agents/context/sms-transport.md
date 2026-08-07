@@ -105,7 +105,7 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
 ## Batch log
 
 - **Batch 1**: `PeerEntity.phoneNumber` + `MIGRATION_1_2`. Schema only — no transport code yet.
-- **Batch 2** (this): `SmsTransport` (`mesh/sms/SmsTransport.kt`) implementing `MeshTransport` per the
+- **Batch 2**: `SmsTransport` (`mesh/sms/SmsTransport.kt`) implementing `MeshTransport` per the
   "implement the interface anyway" decision above — text-only, addressed to peers with both `phoneNumber`
   and a pinned `pubKey`. `SmsWireCodec` (`mesh/sms/SmsWireCodec.kt`) is the pure-logic base64 framing +
   part-count estimator, unit-tested on the JVM. Wired into `CompositeMeshTransport` last (lowest
@@ -116,4 +116,51 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
   (`required=false`). Not done: MMS/`sendFile` (always `false`), `SmsReceiver` UI/permission-request flow
   (the transport registers its own dynamic receiver, but nothing yet prompts the user for the two
   permissions), `CallManager`, the encrypted contacts vault. All still open per the list above.
+- **Batch 3** (this): claimed the Android default-SMS-app role (per the decision above) and built real MMS.
+  - `DefaultSmsRole` (`mesh/sms/DefaultSmsRole.kt`): `isDefaultSmsApp` check (`Telephony.Sms.
+    getDefaultSmsPackage`) + `RoleManager`-based request-intent builder. minSdk 29 is also `RoleManager`'s
+    own floor, so there's no legacy `ACTION_CHANGE_DEFAULT` fallback to carry.
+  - `MmsWsp` (`mesh/sms/MmsWsp.kt`): hand-decodes the `M-Notification.ind` WSP PDU enough to extract
+    transaction ID + content location. **Highest-risk, least-verified code in the project** — see its class
+    doc. Only self-consistency-tested (`MmsWspTest.kt`, JVM) against a synthetic PDU built from this same
+    parser's own encoding model; there's no real carrier payload available in this sandbox to validate
+    against, and WSP header types this parser doesn't recognize can't be safely skipped, so it fails closed
+    rather than guesses. Needs real-device testing against live carrier MMSC traffic before it's trusted;
+    `com.klinkerapps:android-smsmms` (Apache-2.0, Maven Central) is the fallback if it proves unreliable.
+  - `MmsSender` (`mesh/sms/MmsSender.kt`): writes an outgoing MMS as `Telephony.Mms`/`Addr`/`Part` provider
+    rows (SMIL + a `application/x-lattice-wire` part carrying the base64 wire envelope), then calls
+    `SmsManager.sendMultimediaMessage`. **Second-highest risk** — the provider row schema is real, stable,
+    documented API, but only verified by reading the docs, not by a compile or device test.
+  - `MmsWapPushReceiver` (manifest, `WAP_PUSH_DELIVER_ACTION`) + `SmsDeliverReceiver` (manifest,
+    `SMS_DELIVER_ACTION`) replace batch 2's dynamically-registered receiver — both are default-app-only
+    broadcasts. `SmsDeliverReceiver` adds the **safety net**: a plain SMS that doesn't decode as a Lattice
+    wire envelope gets persisted to `Telephony.Sms.Inbox` (the platform's own required contract for a
+    default SMS app), not silently dropped — though there's still no in-app UI to read it, see the new open
+    item below. `RespondViaMessageService` is a minimal stub for `ACTION_RESPOND_VIA_MESSAGE`, one of the
+    components the role requires; Lattice has no quick-response UI concept, so it just sends plain text via
+    `SmsManager` directly.
+  - `SmsTransport.send()` now routes an oversized payload (over `SMS_PART_CEILING` = 10 concatenated parts —
+    see the wire-size measurement) through MMS instead of an ever-longer SMS chain. `sendFile` is still
+    `false` — **not an MMS limitation**, see its doc: every other transport's file path rides an
+    already-established per-peer encrypted session before bytes move, SMS/MMS has none, and wiring
+    `MessageCrypto.seal`-style per-recipient encryption through this path is a distinct task worth its own
+    pass rather than a rushed, security-relevant shortcut at the end of this batch.
+  - `SmsTransport.health` now requires `DefaultSmsRole.isDefaultSmsApp` — without the role there's no
+    real transport, not a degraded SMS-only one.
+  - Manifest: `RECEIVE_MMS`, `RECEIVE_WAP_PUSH`, `READ_SMS`; `MainActivity` gained a `SENDTO` intent-filter
+    for `sms`/`smsto`/`mms`/`mmsto` (one of the role's required components).
+
+## New open items (batch 3)
+
+- **No UI prompts for the default-SMS-app role.** `DefaultSmsRole.requestRoleIntent` exists; nothing calls
+  it. Onboarding needs a step for this the same way it has one for the mesh radio permissions
+  (`ui/onboarding/OnboardingScreen.kt`) before this transport does anything in practice.
+- **No conversation UI for plain (non-Lattice) SMS/MMS.** The safety net means a plain text is *stored*, not
+  lost — but there's still nowhere in Lattice to read it. A user who makes Lattice their default SMS app
+  today loses their normal texting UI until this exists.
+- **`MmsWapPushReceiver` doesn't wait for the download to finish** before reading parts back — see the
+  method doc. `SmsManager.downloadMultimediaMessage` is async; a slow download's wire-envelope part can be
+  missed. Needs a real `DOWNLOADED_ACTION`/callback listener, not a same-call read.
+- **`sendFile`** — see above, needs per-recipient encryption wired in before it can move real attachment
+  bytes over MMS.
 
