@@ -191,7 +191,8 @@ class SmsTransport(
                 PackageManager.PERMISSION_GRANTED
         val hasSim = telephonyManager?.simState == TelephonyManager.SIM_STATE_READY
         val isDefault = DefaultSmsRole.isDefaultSmsApp(appContext)
-        return if (hasPermissions && hasSim && isDefault && smsManager != null) {
+        val isReady = hasPermissions && hasSim && isDefault
+        return if (isReady && smsManager != null) {
             TransportHealth.Healthy
         } else {
             TransportHealth.Unavailable

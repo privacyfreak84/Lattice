@@ -45,8 +45,17 @@ object MmsSender {
         attachment: Pair<File, String>? = null, // file + its MIME type
     ): Boolean {
         val resolver = context.contentResolver
-        val now = System.currentTimeMillis() / 1000
+        val messageId = insertMessageRow(resolver, attachment != null) ?: return false
+        insertAddrRow(resolver, messageId, toPhoneNumber)
+        insertParts(resolver, messageId, wireBytes, attachment)
+        return sendPdu(context, resolver, messageId)
+    }
 
+    private fun insertMessageRow(
+        resolver: ContentResolver,
+        hasAttachment: Boolean,
+    ): Long? {
+        val now = System.currentTimeMillis() / 1000
         val messageValues =
             ContentValues().apply {
                 put(Telephony.Mms.MESSAGE_BOX, Telephony.Mms.MESSAGE_BOX_OUTBOX)
@@ -54,12 +63,18 @@ object MmsSender {
                 put(Telephony.Mms.READ, 1)
                 put(Telephony.Mms.SEEN, 1)
                 put(Telephony.Mms.MESSAGE_TYPE, MmsWsp.MESSAGE_TYPE_SEND_REQ)
-                put(Telephony.Mms.MMS_VERSION, 0x90) // MMS 1.0, short-integer form
-                put(Telephony.Mms.TEXT_ONLY, if (attachment == null) 1 else 0)
+                put(Telephony.Mms.MMS_VERSION, MMS_VERSION_1_0)
+                put(Telephony.Mms.TEXT_ONLY, if (hasAttachment) 0 else 1)
             }
-        val messageUri = resolver.insert(Telephony.Mms.CONTENT_URI, messageValues) ?: return false
-        val messageId = ContentUris.parseId(messageUri)
+        val messageUri = resolver.insert(Telephony.Mms.CONTENT_URI, messageValues) ?: return null
+        return ContentUris.parseId(messageUri)
+    }
 
+    private fun insertAddrRow(
+        resolver: ContentResolver,
+        messageId: Long,
+        toPhoneNumber: String,
+    ) {
         val addrUri = Uri.withAppendedPath(ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, messageId), "addr")
         resolver.insert(
             addrUri,
@@ -69,48 +84,34 @@ object MmsSender {
                 put(Telephony.Mms.Addr.CHARSET, CHARSET_UTF_8)
             },
         )
+    }
 
+    private fun insertParts(
+        resolver: ContentResolver,
+        messageId: Long,
+        wireBytes: ByteArray,
+        attachment: Pair<File, String>?,
+    ) {
         val partUri = Uri.withAppendedPath(ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, messageId), "part")
         // SMIL part: minimal single-region, single-slide layout referencing the parts below. Real MMS clients
         // expect a SMIL part to exist even for a "just text" message; a well-formed but trivial one here.
-        insertPart(
-            resolver,
-            partUri,
-            messageId,
-            SMIL_CONTENT_TYPE,
-            name = "smil.xml",
-            text = SMIL_TEMPLATE,
-        )
+        insertPart(resolver, partUri, messageId, SMIL_CONTENT_TYPE, name = "smil.xml", text = SMIL_TEMPLATE)
         // The Lattice wire-envelope payload itself, as base64 text (reuses SmsWireCodec's framing).
-        insertPart(
-            resolver,
-            partUri,
-            messageId,
-            WIRE_PART_CONTENT_TYPE,
-            name = "wire",
-            text = SmsWireCodec.encode(wireBytes),
-        )
+        insertPart(resolver, partUri, messageId, WIRE_PART_CONTENT_TYPE, name = "wire", text = SmsWireCodec.encode(wireBytes))
         if (attachment != null) {
             val (file, mimeType) = attachment
-            insertPart(
-                resolver,
-                partUri,
-                messageId,
-                mimeType,
-                name = ATTACHMENT_PART_NAME,
-                dataPath = file.absolutePath,
-            )
+            insertPart(resolver, partUri, messageId, mimeType, name = ATTACHMENT_PART_NAME, dataPath = file.absolutePath)
         }
+    }
 
-        val configOverrides = Bundle()
+    private fun sendPdu(
+        context: Context,
+        resolver: ContentResolver,
+        messageId: Long,
+    ): Boolean {
+        val messageUri = ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, messageId)
         return runCatching {
-            SmsManager.getDefault().sendMultimediaMessage(
-                context,
-                messageUri,
-                null,
-                configOverrides,
-                null as PendingIntent?,
-            )
+            SmsManager.getDefault().sendMultimediaMessage(context, messageUri, null, Bundle(), null as PendingIntent?)
             true
         }.onFailure { Log.w(TAG, "sendMultimediaMessage failed", it) }.getOrDefault(false)
     }
@@ -150,6 +151,7 @@ object MmsSender {
     // any third-party MMS implementation reproduces (e.g. klinkerapps/android-smsmms's PduHeaders.java).
     private const val ADDRESS_TYPE_TO = 151
     private const val CHARSET_UTF_8 = 106 // MIBEnum for UTF-8, per the IANA charset registry MMS uses
+    private const val MMS_VERSION_1_0 = 0x90 // short-integer form
 
     // A minimal single-slide SMIL layout: one region, this part's text + (if present) the attachment shown
     // together. Real MMS viewers expect a SMIL part; this is deliberately as simple as the format allows.

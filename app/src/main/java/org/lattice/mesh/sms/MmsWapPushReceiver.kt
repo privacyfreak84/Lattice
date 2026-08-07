@@ -14,7 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.lattice.mesh.protocol.RelayEnvelope
 import org.lattice.mesh.protocol.WireCodec
+import org.lattice.mesh.protocol.WireEnvelope
 
 /**
  * Manifest-declared receiver for `WAP_PUSH_DELIVER_ACTION` — the OS only delivers this to the default SMS
@@ -54,16 +56,29 @@ class MmsWapPushReceiver :
     /**
      * Inserts a draft "downloading" row (mirrors what [MmsSender] writes for an outgoing message — the
      * download call needs a destination content URI the same way sending needs a source one), downloads via
-     * [SmsManager.downloadMultimediaMessage], then reads back whichever wire-envelope part (if any) got
-     * written and routes it into [smsTransport]'s inbound flow. A downloaded MMS with no Lattice wire part
-     * is left exactly as the platform wrote it — a normal MMS in the Inbox, per the "safety net" batch 3
-     * note in the design doc (a non-Lattice message must not silently vanish now that Lattice is the
-     * default SMS app).
+     * [SmsManager.downloadMultimediaMessage], then hands off to [routeIfDecodable]. A downloaded MMS with no
+     * Lattice wire part is left exactly as the platform wrote it — a normal MMS in the Inbox, per the
+     * "safety net" batch 3 note in the design doc (a non-Lattice message must not silently vanish now that
+     * Lattice is the default SMS app).
      */
     private suspend fun downloadAndRoute(
         context: Context,
         notification: MmsWsp.MmsNotification,
     ) {
+        val messageId = insertDownloadingRow(context, notification) ?: return
+        val messageUri = ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, messageId)
+        SmsManager.getDefault().downloadMultimediaMessage(context, notification.contentLocation, messageUri, Bundle(), null)
+        // downloadMultimediaMessage is itself async (it returns once the HTTP fetch is queued, not once it's
+        // done) — see the design notes' known gap: this doesn't yet wait for/listen to that completion
+        // before reading parts back, so a wire-envelope part written by a slow download can be missed here.
+        // Needs a real DOWNLOADED_ACTION PendingIntent listener, not a same-call read, to close that gap.
+        routeIfDecodable(context, messageId)
+    }
+
+    private fun insertDownloadingRow(
+        context: Context,
+        notification: MmsWsp.MmsNotification,
+    ): Long? {
         val values =
             ContentValues().apply {
                 put(Telephony.Mms.MESSAGE_BOX, Telephony.Mms.MESSAGE_BOX_INBOX)
@@ -72,28 +87,35 @@ class MmsWapPushReceiver :
                 put(Telephony.Mms.READ, 0)
                 put(Telephony.Mms.SEEN, 0)
             }
-        val messageUri = context.contentResolver.insert(Telephony.Mms.CONTENT_URI, values) ?: return
-        val messageId = ContentUris.parseId(messageUri)
+        val messageUri = context.contentResolver.insert(Telephony.Mms.CONTENT_URI, values) ?: return null
+        return ContentUris.parseId(messageUri)
+    }
 
-        SmsManager.getDefault().downloadMultimediaMessage(
-            context,
-            notification.contentLocation,
-            messageUri,
-            Bundle(),
-            null,
-        )
-
-        // downloadMultimediaMessage is itself async (it returns once the HTTP fetch is queued, not once it's
-        // done) — see the design notes' known gap: this doesn't yet wait for/listen to that completion
-        // before reading parts back, so a wire-envelope part written by a slow download can be missed here.
-        // Needs a real DOWNLOADED_ACTION PendingIntent listener, not a same-call read, to close that gap.
+    /** Reads back whichever wire-envelope part (if any) got written and routes it into [smsTransport]. */
+    private fun routeIfDecodable(
+        context: Context,
+        messageId: Long,
+    ) {
         val wirePart = readWirePart(context, messageId) ?: return
-        val bytes = SmsWireCodec.decode(wirePart) ?: return
-        val wire = WireCodec.decodeWire(bytes) ?: return
-        val envelope = WireCodec.decodeEnvelope(wire.signed) ?: return
-        val sender = readFromAddress(context, messageId) ?: return
-        val fromNodeId = smsTransport.nodeIdForPhoneNumber(sender) ?: return
-        smsTransport.handleDecodedInbound(wire, envelope, fromNodeId)
+        val decoded = decodeWireEnvelope(wirePart) ?: return
+        val fromNodeId = nodeIdForMessage(context, messageId) ?: return
+        smsTransport.handleDecodedInbound(decoded.first, decoded.second, fromNodeId)
+    }
+
+    private fun decodeWireEnvelope(text: String): Pair<WireEnvelope, RelayEnvelope>? {
+        val bytes = SmsWireCodec.decode(text) ?: return null
+        val wire = WireCodec.decodeWire(bytes) ?: return null
+        val envelope = WireCodec.decodeEnvelope(wire.signed) ?: return null
+        return wire to envelope
+    }
+
+    /** Reads the MMS `Addr` row with `TYPE = ADDRESS_TYPE_FROM` for [messageId] and resolves it to a nodeId. */
+    private fun nodeIdForMessage(
+        context: Context,
+        messageId: Long,
+    ): String? {
+        val sender = readFromAddress(context, messageId) ?: return null
+        return smsTransport.nodeIdForPhoneNumber(sender)
     }
 
     /** Reads the MMS `Addr` row with `TYPE = ADDRESS_TYPE_FROM` for [messageId] — the sender's number. */

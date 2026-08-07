@@ -152,9 +152,6 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
 
 ## New open items (batch 3)
 
-- **No UI prompts for the default-SMS-app role.** `DefaultSmsRole.requestRoleIntent` exists; nothing calls
-  it. Onboarding needs a step for this the same way it has one for the mesh radio permissions
-  (`ui/onboarding/OnboardingScreen.kt`) before this transport does anything in practice.
 - **No conversation UI for plain (non-Lattice) SMS/MMS.** The safety net means a plain text is *stored*, not
   lost — but there's still nowhere in Lattice to read it. A user who makes Lattice their default SMS app
   today loses their normal texting UI until this exists.
@@ -163,4 +160,36 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
   missed. Needs a real `DOWNLOADED_ACTION`/callback listener, not a same-call read.
 - **`sendFile`** — see above, needs per-recipient encryption wired in before it can move real attachment
   bytes over MMS.
+
+## Post-batch-3 follow-up: detekt fixes, onboarding UI, real execution verification
+
+CI's `detekt` task (separate from `ktlintCheck`) failed on 8 issues after the batch-3 push — `LongMethod`
+on `MmsSender.send`, `ReturnCount`/`CyclomaticComplexMethod` on `MmsWsp.parseNotificationInd`,
+`ReturnCount` on `MmsWapPushReceiver.downloadAndRoute`, magic numbers in `MmsWsp`, and `ComplexCondition` on
+`SmsTransport.computeHealth`. Fixed by extracting smaller functions (`MmsSender` split into
+`insertMessageRow`/`insertAddrRow`/`insertParts`/`sendPdu`; `MmsWapPushReceiver` split into
+`insertDownloadingRow`/`routeIfDecodable`/`decodeWireEnvelope`/`nodeIdForMessage`), a sealed `FieldOutcome`
++ extracted `Cursor` class in `MmsWsp` to collapse its branching into one `when`, named constants for the
+WSP byte masks, and an intermediate `isReady` boolean in `SmsTransport.computeHealth`. **Verified against
+the actual pinned tool versions, not just re-read** — downloaded the exact `dev.detekt` 2.0.0-alpha.5 CLI
+jar from GitHub releases (`detekt/detekt`) and ran it locally with this repo's `config/detekt/detekt.yml`:
+0 findings across every file this batch touched.
+
+Also went back and actually **executed** (not just read) the two pure-Kotlin, Android-free files —
+`SmsWireCodec` and `MmsWsp` — by pulling the Kotlin compiler from GitHub releases (`JetBrains/kotlin`),
+compiling them with a standalone assertion harness mirroring `SmsWireCodecTest`/`MmsWspTest`, and running
+the resulting jar: all 14 checks passed against real compiled bytecode, not reasoning-about-code. This is
+the strongest verification available in this sandbox for anything Android-free; everything with an
+`android.*` import still can't be compiled or run here (no Google Maven access), so those files remain
+doc-verified only, same caveat as the rest of this project's low-level work.
+
+Wired up the previously-missing onboarding UI for the default-SMS-app role (batch 3 shipped the plumbing
+but nothing to trigger it): `OnboardingScreen` gained an SMS section, shown only when
+`SmsTransport.isSupported` — a permissions button (`requiredSmsPermissions()`, new
+`mesh/sms/SmsPermissions.kt`, mirrors `ui/Permissions.kt`'s mesh-permission pattern) and a "make default"
+button (`DefaultSmsRole.requestRoleIntent` via `ActivityResultContracts.StartActivityForResult`, re-checking
+`isDefaultSmsApp` on result rather than trusting the result code, since `RoleManager`'s request intent
+doesn't reliably signal grant/deny across OEMs). Deliberately doesn't gate `onReady`/"Start meshing" — SMS
+is opt-in, the mesh works without it. New `onboarding_sms_*` strings. Test coverage added to
+`OnboardingScreenContentTest` for the section's visibility and the role button's enabled state.
 
