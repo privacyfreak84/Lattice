@@ -117,4 +117,3 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
   (the transport registers its own dynamic receiver, but nothing yet prompts the user for the two
   permissions), `CallManager`, the encrypted contacts vault. All still open per the list above.
 
-<!-- CI trigger check: confirming Actions fires on push with the new PAT (see chat). Safe to remove once verified. -->
