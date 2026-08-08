@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.lattice.R
-import org.lattice.mesh.sms.DefaultSmsRole
 import org.lattice.mesh.sms.SmsTransport
 import org.lattice.mesh.sms.hasAllSmsPermissions
 import org.lattice.mesh.sms.requiredSmsPermissions
@@ -62,27 +61,19 @@ fun OnboardingScreen(onReady: () -> Unit) {
             granted = hasAllMeshPermissions(context)
         }
 
-    // SMS/MMS carrier fallback (see .agents/context/sms-transport.md) is opt-in, gated on telephony hardware
-    // — a Wi-Fi-only device just never shows this section, not an "unsupported" error the way meshSupported
-    // gets one, since the mesh itself works fine without it.
+    // SMS carrier fallback (see .agents/context/sms-transport.md) is opt-in, gated on telephony hardware —
+    // a Wi-Fi-only device just never shows this section, not an "unsupported" error the way meshSupported
+    // gets one, since the mesh itself works fine without it. No default-SMS-app role here (batch 3 tried
+    // that for MMS, batch 4 reverted it — see the design notes' reversal note): this transport stays a
+    // background RECEIVE_SMS holder, deliberately leaving the user's actual texting app untouched.
     val smsSupported = remember { SmsTransport.isSupported(context) }
     var smsPermissionsGranted by remember { mutableStateOf(hasAllSmsPermissions(context)) }
-    var isDefaultSmsApp by remember { mutableStateOf(DefaultSmsRole.isDefaultSmsApp(context)) }
 
     val smsPermissionsLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
         ) {
             smsPermissionsGranted = hasAllSmsPermissions(context)
-        }
-    val defaultSmsRoleLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.StartActivityForResult(),
-        ) {
-            // Ignore resultCode — RoleManager's request intent doesn't reliably distinguish "granted" from
-            // "denied" across OEMs the way a permission result does; re-checking the actual role state via
-            // getDefaultSmsPackage (DefaultSmsRole.isDefaultSmsApp) is the one source of truth.
-            isDefaultSmsApp = DefaultSmsRole.isDefaultSmsApp(context)
         }
 
     OnboardingScreenContent(
@@ -93,10 +84,6 @@ fun OnboardingScreen(onReady: () -> Unit) {
         smsSupported = smsSupported,
         smsPermissionsGranted = smsPermissionsGranted,
         onGrantSmsPermissions = { smsPermissionsLauncher.launch(requiredSmsPermissions()) },
-        isDefaultSmsApp = isDefaultSmsApp,
-        onRequestDefaultSmsRole = {
-            DefaultSmsRole.requestRoleIntent(context)?.let { defaultSmsRoleLauncher.launch(it) }
-        },
         onReady = onReady,
     )
 }
@@ -110,8 +97,6 @@ internal fun OnboardingScreenContent(
     smsSupported: Boolean,
     smsPermissionsGranted: Boolean,
     onGrantSmsPermissions: () -> Unit,
-    isDefaultSmsApp: Boolean,
-    onRequestDefaultSmsRole: () -> Unit,
     onReady: () -> Unit,
 ) {
     Surface(
@@ -171,7 +156,7 @@ internal fun OnboardingScreenContent(
                 Text(stringResource(R.string.battery_allow_button))
             }
 
-            // SMS/MMS carrier fallback — optional, so this section doesn't block onReady the way the mesh
+            // SMS carrier fallback — optional, so this section doesn't block onReady the way the mesh
             // permissions do; a device can start meshing without ever touching it.
             if (smsSupported) {
                 Text(
@@ -190,24 +175,6 @@ internal fun OnboardingScreenContent(
                             stringResource(R.string.onboarding_sms_permissions_granted)
                         } else {
                             stringResource(R.string.onboarding_sms_grant_permissions)
-                        },
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onRequestDefaultSmsRole,
-                    enabled = smsPermissionsGranted && !isDefaultSmsApp,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .testTag("onboarding_sms_default"),
-                ) {
-                    Text(
-                        if (isDefaultSmsApp) {
-                            stringResource(R.string.onboarding_sms_is_default)
-                        } else {
-                            stringResource(R.string.onboarding_sms_make_default)
                         },
                     )
                 }
@@ -240,8 +207,6 @@ fun OnboardingScreenPreview() =
             smsSupported = true,
             smsPermissionsGranted = false,
             onGrantSmsPermissions = {},
-            isDefaultSmsApp = false,
-            onRequestDefaultSmsRole = {},
             onReady = {},
         )
     }
@@ -258,8 +223,6 @@ fun OnboardingScreenGrantedPreview() =
             smsSupported = true,
             smsPermissionsGranted = true,
             onGrantSmsPermissions = {},
-            isDefaultSmsApp = true,
-            onRequestDefaultSmsRole = {},
             onReady = {},
         )
     }
@@ -276,8 +239,6 @@ fun OnboardingScreenUnsupportedPreview() =
             smsSupported = false,
             smsPermissionsGranted = false,
             onGrantSmsPermissions = {},
-            isDefaultSmsApp = false,
-            onRequestDefaultSmsRole = {},
             onReady = {},
         )
     }

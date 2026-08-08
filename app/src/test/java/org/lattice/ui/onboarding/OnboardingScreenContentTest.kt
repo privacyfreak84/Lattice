@@ -30,8 +30,6 @@ class OnboardingScreenContentTest {
         smsSupported: Boolean = false,
         smsPermissionsGranted: Boolean = false,
         onGrantSmsPermissions: () -> Unit = {},
-        isDefaultSmsApp: Boolean = false,
-        onRequestDefaultSmsRole: () -> Unit = {},
         onReady: () -> Unit = {},
     ) {
         compose.setContent {
@@ -44,8 +42,6 @@ class OnboardingScreenContentTest {
                     smsSupported = smsSupported,
                     smsPermissionsGranted = smsPermissionsGranted,
                     onGrantSmsPermissions = onGrantSmsPermissions,
-                    isDefaultSmsApp = isDefaultSmsApp,
-                    onRequestDefaultSmsRole = onRequestDefaultSmsRole,
                     onReady = onReady,
                 )
             }
@@ -87,7 +83,6 @@ class OnboardingScreenContentTest {
         setContent(smsSupported = false)
 
         compose.onNodeWithTag("onboarding_sms_grant").assertDoesNotExist()
-        compose.onNodeWithTag("onboarding_sms_default").assertDoesNotExist()
     }
 
     @Test
@@ -100,31 +95,11 @@ class OnboardingScreenContentTest {
     }
 
     @Test
-    fun defaultSmsRoleButtonDisabledUntilSmsPermissionsGranted() {
-        setContent(smsSupported = true, smsPermissionsGranted = false)
+    fun smsGrantButtonClickable() {
+        var grants = 0
+        setContent(smsSupported = true, smsPermissionsGranted = false, onGrantSmsPermissions = { grants++ })
 
-        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsNotEnabled()
-    }
-
-    @Test
-    fun defaultSmsRoleButtonEnabledOnceSmsPermissionsGranted() {
-        var requests = 0
-        setContent(
-            smsSupported = true,
-            smsPermissionsGranted = true,
-            isDefaultSmsApp = false,
-            onRequestDefaultSmsRole = { requests++ },
-        )
-
-        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsEnabled()
-        compose.onNodeWithTag("onboarding_sms_default").performClick()
-        assertEquals(1, requests)
-    }
-
-    @Test
-    fun defaultSmsRoleButtonDisabledOnceAlreadyDefault() {
-        setContent(smsSupported = true, smsPermissionsGranted = true, isDefaultSmsApp = true)
-
-        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("onboarding_sms_grant").performScrollTo().performClick()
+        assertEquals(1, grants)
     }
 }

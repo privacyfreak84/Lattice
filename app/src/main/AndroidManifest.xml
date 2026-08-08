@@ -39,17 +39,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
-    <!-- Mesh transport plane 3: SMS/MMS carrier (see org.lattice.mesh.sms.SmsTransport /
-         .agents/context/sms-transport.md). As of batch 3 this claims the Android default-SMS-app role
-         (RoleManager.ROLE_SMS, requested via org.lattice.mesh.sms.DefaultSmsRole — no UI wired to prompt for
-         it yet), which is what MMS categorically requires: only the default app can write the Telephony.Mms
-         provider or receive WAP_PUSH_DELIVER_ACTION. required=false on the telephony feature so a Wi-Fi-only
-         / SIM-less device (tablet) still installs. -->
+    <!-- Mesh transport plane 3: SMS carrier (see org.lattice.mesh.sms.SmsTransport /
+         .agents/context/sms-transport.md). Batch 3 claimed the Android default-SMS-app role for MMS
+         support; batch 4 reverted it — without a real conversation/compose UI for plain SMS, claiming that
+         role would break the user's normal texting (no way to send a plain text, incoming ones vanish with
+         no screen to read them). Deliberately just SEND_SMS/RECEIVE_SMS: a non-default RECEIVE_SMS holder
+         gets a courtesy copy of incoming SMS while the phone's actual default SMS app keeps working
+         untouched. required=false so a Wi-Fi-only / SIM-less device (tablet) still installs. -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_MMS" />
-    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
-    <uses-permission android:name="android.permission.READ_SMS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <!-- QR identity verification (scan a peer's key) — CameraX + zxing core, see ui/scan/. required=false
@@ -99,72 +97,12 @@
                 <data android:mimeType="text/plain" />
                 <data android:mimeType="image/*" />
             </intent-filter>
-            <!-- Default-SMS-app eligibility (org.lattice.mesh.sms.DefaultSmsRole, .agents/context/
-                 sms-transport.md batch 3): RoleManager.ROLE_SMS requires the app declare a component
-                 handling ACTION_SENDTO for sms/smsto/mms/mmsto, so some other app's "message this number"
-                 action can hand off here — this alone doesn't build compose-a-new-message UI for it, MainActivity
-                 just needs to be a valid target. -->
-            <intent-filter>
-                <action android:name="android.intent.action.SENDTO" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:scheme="sms" />
-                <data android:scheme="smsto" />
-                <data android:scheme="mms" />
-                <data android:scheme="mmsto" />
-            </intent-filter>
         </activity>
 
         <service
             android:name=".mesh.MeshService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
-
-        <!-- Default-SMS-app eligibility: the last of the required components. Lattice has no "quick
-             response" UI of its own — see org.lattice.mesh.sms.RespondViaMessageService's doc — this exists
-             to satisfy the platform contract, not as a designed feature. -->
-        <service
-            android:name=".mesh.sms.RespondViaMessageService"
-            android:exported="true"
-            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
-            <intent-filter>
-                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:scheme="sms" />
-                <data android:scheme="smsto" />
-                <data android:scheme="mms" />
-                <data android:scheme="mmsto" />
-            </intent-filter>
-        </service>
-
-        <!-- Plain-SMS delivery — only sent to the default SMS app (see org.lattice.mesh.sms.SmsDeliverReceiver
-             for the "safety net" persistence this receiver adds now that Lattice can hold that role).
-             android:permission requires the sender hold BROADCAST_SMS, which only the system does. -->
-        <receiver
-            android:name=".mesh.sms.SmsDeliverReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.SMS_DELIVER" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Incoming-MMS notification — see org.lattice.mesh.sms.MmsWapPushReceiver /
-             org.lattice.mesh.sms.MmsWsp. Same default-app-only delivery, gated on BROADCAST_WAP_PUSH (system
-             only) and the WAP MMS content-type this action carries. -->
-        <receiver
-            android:name=".mesh.sms.MmsWapPushReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_WAP_PUSH">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
-
-                <data android:mimeType="application/vnd.wap.mms-message" />
-            </intent-filter>
-        </receiver>
 
         <!-- Restart the always-on mesh after a device reboot, unless the user manually stopped it
              (mesh_enabled=false). BOOT_COMPLETED is delivered post-unlock, so the credential-encrypted

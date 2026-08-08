@@ -61,14 +61,15 @@ skips a peer with no number the same way any transport skips a peer it can't rea
   "attacker-resistant" rather than a trust-on-first-use downgrade from what mesh already does? Still open;
   `SmsTransport` (batch 2) only ever surfaces peers that already have both a `phoneNumber` and a pinned
   `pubKey`, same trust model as every other transport — an SMS-only contact simply isn't representable yet.
-- **MMS / large payloads.** Still open. `SmsTransport.sendFile` always returns `false` in batch 2 — see the
-  wire-size measurement below for why a single-recipient DM fits SMS but attachments and larger group
-  messages don't.
-- **Default SMS app.** Decided for now (batch 2): **not claimed.** `SmsTransport` registers only a dynamic
-  `BroadcastReceiver` for `SMS_RECEIVED_ACTION`, which any app holding `RECEIVE_SMS` gets regardless of
-  default-app status. This is the smaller ask and enough for send/receive of Lattice's own traffic; it does
-  *not* get us reliable interception ahead of the real default SMS app, or the ability to suppress the
-  system "message sent" UI chrome. Revisit if that turns out to matter in practice.
+- **MMS / large payloads.** Tried and reverted — see the batch 4 entry below. Still no MMS.
+- **Default SMS app.** Decided (batch 2), reverted to that decision after a batch 3 detour: **not
+  claimed.** `SmsTransport` registers only a dynamic `BroadcastReceiver` for `SMS_RECEIVED_ACTION`, which
+  any app holding `RECEIVE_SMS` gets regardless of default-app status. This is the smaller ask and enough
+  for send/receive of Lattice's own traffic; it does *not* get us MMS, reliable interception ahead of the
+  real default SMS app, or the ability to suppress the system "message sent" UI chrome. Batch 3 claimed the
+  role anyway to get MMS; batch 4 reverted it once it became clear that without a real plain-SMS
+  conversation UI, claiming the role breaks the user's actual texting rather than adding to it. Revisit only
+  alongside a genuine "Lattice as a full SMS app" UI project — see the batch 4 entry.
 - **Dres's `ContactsStore.kt`** — still unresolved, not touched by batch 2.
 - **Phone number normalization.** `SmsTransport.onSmsReceived` matches an inbound SMS's `originatingAddress`
   against the stored `phoneNumber` with an exact string comparison — no E.164 normalization. A correctly
@@ -150,18 +151,45 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
   - Manifest: `RECEIVE_MMS`, `RECEIVE_WAP_PUSH`, `READ_SMS`; `MainActivity` gained a `SENDTO` intent-filter
     for `sms`/`smsto`/`mms`/`mmsto` (one of the role's required components).
 
-## New open items (batch 3)
+## New open items (batch 3, superseded by batch 4 — kept for history)
 
-- **No conversation UI for plain (non-Lattice) SMS/MMS.** The safety net means a plain text is *stored*, not
-  lost — but there's still nowhere in Lattice to read it. A user who makes Lattice their default SMS app
-  today loses their normal texting UI until this exists.
-- **`MmsWapPushReceiver` doesn't wait for the download to finish** before reading parts back — see the
-  method doc. `SmsManager.downloadMultimediaMessage` is async; a slow download's wire-envelope part can be
-  missed. Needs a real `DOWNLOADED_ACTION`/callback listener, not a same-call read.
-- **`sendFile`** — see above, needs per-recipient encryption wired in before it can move real attachment
-  bytes over MMS.
+- ~~No conversation UI for plain (non-Lattice) SMS/MMS.~~ Moot — batch 4 reverted the default-SMS-app claim
+  this depended on. This is the exact problem that triggered the revert: with no conversation/compose UI,
+  claiming the role broke the user's actual texting rather than adding to it.
+- ~~`MmsWapPushReceiver` doesn't wait for the download to finish before reading parts back.~~ Moot —
+  `MmsWapPushReceiver` (and MMS entirely) was removed in batch 4.
+- **`sendFile`** — still open, unrelated to the MMS revert. Needs per-recipient encryption wired in before
+  any transport-level file send would be safe; not specific to SMS/MMS.
 
-## Post-batch-3 follow-up: detekt fixes, onboarding UI, real execution verification
+## Batch 4: reverted the default-SMS-app role, removed MMS
+
+Talked through the tradeoff directly: claiming the default-SMS-app role (batch 3) unlocked MMS for Lattice's
+own protocol messages, but at the cost of the user's actual phone texting — no compose UI to send a plain
+text to anyone, and incoming plain texts from real contacts landing in the safety-net's silent
+`Telephony.Sms.Inbox` persistence with no screen in Lattice to ever read them. For someone who actually
+made Lattice their default SMS app, the phone would look like it stopped receiving texts. That's a real
+regression to ship for MMS support, not a rough edge — reverted rather than push a UI project to fix it
+under time pressure.
+
+Removed entirely: `DefaultSmsRole.kt`, `MmsWsp.kt`, `MmsSender.kt`, `MmsWapPushReceiver.kt`,
+`SmsDeliverReceiver.kt`, `RespondViaMessageService.kt`, `MmsWspTest.kt`. `SmsTransport` reverted to batch 2's
+shape: a dynamically-registered `SMS_RECEIVED_ACTION` receiver (courtesy-copy delivery to any
+`RECEIVE_SMS`-holding app, default or not — the phone's actual default SMS app keeps working, completely
+untouched, in parallel), `health` back to permission+SIM only (no `isDefaultSmsApp` check), `send()` back to
+pure concatenated-SMS with no MMS routing branch. `sendFile` stays `false`, same as always.
+`requiredSmsPermissions()` back to `SEND_SMS`/`RECEIVE_SMS` only. Manifest: dropped `RECEIVE_MMS`,
+`RECEIVE_WAP_PUSH`, `READ_SMS`, the `SENDTO` intent-filter on `MainActivity`, and the three
+default-app-only manifest components. `di/MeshModule.kt`'s `SmsTransport` binding reverted from a
+standalone `single` (needed so manifest receivers could `by inject()` the same instance) back to plain
+inline construction in `CompositeMeshTransport`'s children list. Onboarding's SMS section keeps just the
+permissions button; the "make default" button and its strings are gone.
+
+If MMS and a real "use Lattice like a normal SMS app" experience get built later, that's a genuine,
+substantial UI project — conversation list, compose screen, thread persistence — not something to back into
+via a role claim with no UI behind it. Treat it as its own deliberate feature, decided and scoped up front,
+not a batch tacked onto the mesh-transport work.
+
+## Post-batch-3 follow-up: detekt fixes, onboarding UI, real execution verification (historical — MMS since removed)
 
 CI's `detekt` task (separate from `ktlintCheck`) failed on 8 issues after the batch-3 push — `LongMethod`
 on `MmsSender.send`, `ReturnCount`/`CyclomaticComplexMethod` on `MmsWsp.parseNotificationInd`,

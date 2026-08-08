@@ -44,12 +44,10 @@ val meshModule =
         // every hardware-supported plane in a CompositeMeshTransport behind the single-transport seam —
         // Bluetooth LE and Wi-Fi Aware, in descending send-preference. Each plane is gated on isSupported() so
         // an unsupported one is simply absent (a device with neither yields an inert, Degraded composite).
-        // Carrier fallback transport — SMS text plus real MMS (see mesh/sms/SmsTransport.kt,
-        // .agents/context/sms-transport.md batch 3). A standalone single (not just inline in the composite's
-        // children list) because SmsDeliverReceiver/MmsWapPushReceiver — manifest-declared BroadcastReceivers
-        // the OS instantiates fresh per broadcast — need to reach the *same* running instance via `by inject()`
-        // to route decoded frames into its inbound flow; nothing else in this file needs that.
-        single { SmsTransport(androidContext(), get(), get()) }
+        // Carrier fallback transport — SMS text only, no MMS (see mesh/sms/SmsTransport.kt,
+        // .agents/context/sms-transport.md batch 4: batch 3's default-SMS-app claim was reverted, so this
+        // is back to an inline child like the radio transports — no manifest receiver needs to reach a
+        // shared instance via DI anymore, since inbound routing is this transport's own dynamic receiver.
         single<MeshTransport> {
             demoTransportOrNull() ?: run {
                 val ctx = androidContext()
@@ -70,7 +68,7 @@ val meshModule =
                         // self-degrades to Unavailable at runtime if SEND_SMS/RECEIVE_SMS aren't granted or there's
                         // no SIM, same pattern as the radio transports self-degrading on a missing permission.
                         if (SmsTransport.isSupported(ctx)) {
-                            add(get<SmsTransport>())
+                            add(SmsTransport(ctx, get(), get()))
                         }
                     }
                 CompositeMeshTransport(children, get(), get()) { msg ->

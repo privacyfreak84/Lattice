@@ -59,12 +59,9 @@
     <string name="onboarding_permissions_granted">Permissions granted</string>
     <string name="onboarding_unsupported">This device doesn\'t support Wi-Fi Aware, so it can\'t join the mesh. You can still open the app, but it won\'t connect to nearby phones.</string>
     <string name="onboarding_start">Start meshing</string>
-    <string name="onboarding_sms_blurb">Lattice can also reach peers over SMS/MMS when they\'re out of mesh range, but that needs your phone to make Lattice its default messaging app — plain texts from your other contacts get stored safely, but there\'s no inbox screen for them here yet.</string>
+    <string name="onboarding_sms_blurb">Lattice can also reach peers over SMS when they\'re out of mesh range. This doesn\'t change how texting works on your phone otherwise — Lattice just gets a copy of incoming SMS to check for its own messages, your regular texting app keeps working exactly as before.</string>
     <string name="onboarding_sms_grant_permissions">Grant SMS permissions</string>
     <string name="onboarding_sms_permissions_granted">SMS permissions granted</string>
-    <string name="onboarding_sms_make_default">Make Lattice my default SMS app</string>
-    <string name="onboarding_sms_is_default">Lattice is your default SMS app</string>
-    <string name="onboarding_sms_skip">Not now</string>
 
     <!-- Chat -->
     <string name="chat_more_options">More options</string>
