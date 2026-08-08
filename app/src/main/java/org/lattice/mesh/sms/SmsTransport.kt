@@ -93,7 +93,16 @@ class SmsTransport(
             .observeWithPhoneNumber()
             .onEach { rows ->
                 phoneNumberFor.clear()
-                rows.forEach { row -> row.phoneNumber?.let { phoneNumberFor[row.nodeId] = it } }
+                val region = defaultRegion()
+                rows.forEach { row ->
+                    val number = row.phoneNumber ?: return@forEach
+                    val normalized = PhoneNumberNormalizer.normalize(number, region)
+                    if (normalized == null) {
+                        Log.w(TAG, "stored phoneNumber for ${row.nodeId} failed to normalize; excluding from SMS routing")
+                    } else {
+                        phoneNumberFor[row.nodeId] = normalized
+                    }
+                }
                 _neighbors.value = phoneNumberFor.keys.map { Peer(it) }.toSet()
             }.launchIn(scope)
 
@@ -157,14 +166,26 @@ class SmsTransport(
         val bytes = SmsWireCodec.decode(text) ?: return
         val wire = WireCodec.decodeWire(bytes) ?: return
         val envelope = WireCodec.decodeEnvelope(wire.signed) ?: return
-        // KNOWN GAP (not resolved this batch): exact string match against the stored E.164 phoneNumber.
-        // originatingAddress's formatting isn't guaranteed to match what was stored (spacing, a missing/extra
-        // country code) — a real implementation needs number normalization before this comparison, or inbound
-        // frames from a correctly-configured peer can silently fail to match here. Flagging rather than
-        // guessing at a normalization scheme without a concrete carrier/locale case to test it against.
-        val fromNodeId = phoneNumberFor.entries.firstOrNull { it.value == sender }?.key ?: return
+        // Both sides of this comparison are normalized to E.164 through the same PhoneNumberNormalizer path
+        // (phoneNumberFor's values, set in start()'s observeWithPhoneNumber collector) — see that class doc
+        // for why. A sender address that fails to normalize (alphanumeric sender ID, malformed) can never
+        // match a real peer, so it falls through to the same "unrecognized number" outcome as a normalized
+        // sender with no matching entry.
+        val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion())
+        val fromNodeId =
+            normalizedSender
+                ?.let { ns -> phoneNumberFor.entries.firstOrNull { it.value == ns }?.key }
+                ?: return
         scope.launch { _inbound.emit(InboundFrame(wire, envelope, fromNodeId)) }
     }
+
+    // SIM country as the default region for parsing national-format (no leading '+') numbers — both the
+    // stored peer number and an incoming originatingAddress. Not persisted/cached: telephonyManager.simCountryIso
+    // is a cheap synchronous read (no IPC), and re-reading it live means a SIM swap takes effect without needing
+    // to restart the transport. Empty/absent (no SIM, or a CDMA phone with no ISO country code available) falls
+    // through to null, which PhoneNumberNormalizer.normalize then can only resolve for already-international
+    // ('+'-prefixed) numbers — see its doc.
+    private fun defaultRegion(): String? = telephonyManager?.simCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
 
     private fun computeHealth(): TransportHealth {
         val hasPermissions =

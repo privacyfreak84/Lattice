@@ -452,6 +452,8 @@ dependencies {
 
     // E2E encryption (Tink — Java + native, no Kotlin metadata / no Gradle plugin, like SQLCipher)
     implementation(libs.tink.android)
+    // Phone number normalization (SmsTransport) — see the version catalog for why this artifact.
+    implementation(libs.libphonenumber)
     // QR identity verification (safety-number / QR verify screen). zxing core is the pure-Java codec for
     // both directions — it renders our identity QR (ui/image/QrCode.kt) and decodes camera frames
     // (ui/scan/QrDecoder.kt). CameraX drives the camera; we own the analyze loop so a malformed frame can

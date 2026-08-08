@@ -47,6 +47,13 @@ litert = "1.4.2"
 # Kotlin-2.4 toolchain. Works on minSdk 29 (the platform XDH/Ed25519 APIs are API 33+, which is why we
 # don't use java.security directly).
 tink = "1.18.0"
+# Phone number normalization for the SMS transport (SmsTransport.onSmsReceived matching originatingAddress
+# against the stored E.164 PeerEntity.phoneNumber). Pure Java, no Gradle plugin, no Kotlin metadata — same
+# shape as Tink/SQLCipher/zxing above. We use the plain "libphonenumber" artifact (not -android — see the
+# io.michaelrocks fork's own rationale, which only matters for apps needing a slimmer metadata resource;
+# not a concern at Lattice's size) since offline-metadata correctness matters more here than a few hundred
+# KB of APK size.
+libphonenumber = "9.0.33"
 # QR identity verification. zxing core is the pure-Java codec — it both *generates* the identity QR
 # (ui/image/QrCode.kt) and *decodes* camera frames (ui/scan/QrDecoder.kt). Being Android-free is what
 # keeps QrDecoder a plain-JVM unit-test target (see QrDecoderTest).
@@ -200,6 +207,7 @@ coil-gif = { group = "io.coil-kt.coil3", name = "coil-gif", version.ref = "coil"
 
 litert = { group = "com.google.ai.edge.litert", name = "litert", version.ref = "litert" }
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink" }
+libphonenumber = { group = "com.googlecode.libphonenumber", name = "libphonenumber", version.ref = "libphonenumber" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 
 # CameraX: the QR identity scanner's camera stack (see the cameraX version pin for the constraints).

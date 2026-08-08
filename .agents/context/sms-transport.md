@@ -71,11 +71,35 @@ skips a peer with no number the same way any transport skips a peer it can't rea
   conversation UI, claiming the role breaks the user's actual texting rather than adding to it. Revisit only
   alongside a genuine "Lattice as a full SMS app" UI project — see the batch 4 entry.
 - **Dres's `ContactsStore.kt`** — still unresolved, not touched by batch 2.
-- **Phone number normalization.** `SmsTransport.onSmsReceived` matches an inbound SMS's `originatingAddress`
-  against the stored `phoneNumber` with an exact string comparison — no E.164 normalization. A correctly
-  configured peer whose carrier delivers a differently-formatted address (spacing, missing/extra country
-  code) will silently fail to match. Needs a real normalization scheme, tested against actual carrier
-  behavior, not a guessed one.
+
+## Phone number normalization (resolved)
+
+`SmsTransport.onSmsReceived` used to match an inbound SMS's `originatingAddress` against the stored
+`phoneNumber` with an exact string comparison — no E.164 normalization, so a correctly configured peer
+whose carrier delivered a differently-formatted address (spacing, missing/extra country code) would
+silently fail to match.
+
+Fixed with `PhoneNumberNormalizer.kt` (wraps `com.googlecode.libphonenumber`, see the version catalog for
+why this dependency): both the stored `phoneNumber` (normalized once per `observeWithPhoneNumber` refresh,
+in `start()`) and the inbound `originatingAddress` (normalized per-message, in `onSmsReceived`) go through
+the same `normalize()` call before comparison, using the SIM's country (`telephonyManager.simCountryIso`)
+as the default region for national-format numbers. A stored number that fails to normalize is excluded
+from SMS routing with a warning log rather than silently matching nothing; an inbound sender that fails to
+normalize (alphanumeric sender ID, malformed address) falls through to the same "unrecognized number"
+outcome as a normalized sender with no matching entry.
+
+Verified against the actual pinned tool versions: downloaded ktlint 1.8.0 and detekt 2.0.0-alpha.5 CLI
+jars from GitHub releases and ran both against every changed file — 0 findings (detekt did catch a real
+`ReturnCount` violation on the first pass; fixed by merging two guard clauses into one). Couldn't compile
+or execute against real bytecode this time — unlike `SmsWireCodec`/`MmsWsp` earlier, `PhoneNumberNormalizer`
+needs the actual `libphonenumber` jar, which isn't resolvable in this sandbox (no Maven Central/Google
+Maven access) — so this is doc/lint-verified, not execution-verified. Added `PhoneNumberNormalizerTest.kt`
+(JVM unit test) for CI to actually run.
+
+**Known follow-up:** adding `libphonenumber` means `app/gradle.lockfile` needs regenerating
+(`./gradlew :app:dependencies --write-locks`) somewhere with real Maven access — this sandbox can't do it
+(same constraint as above). Until that runs, CI's `./gradlew lint` will fail with dependency-locking errors,
+per the gotcha already documented in `.agents/rules/build-and-test.md`.
 
 ## Wire-size measurement (resolved, batch 2)
 
