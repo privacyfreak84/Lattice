@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -93,14 +94,16 @@ class OnboardingScreenContentTest {
     fun smsSectionShownWhenTelephonySupported() {
         setContent(smsSupported = true)
 
-        compose.onNodeWithTag("onboarding_sms_grant").assertIsDisplayed()
+        // The onboarding Column scrolls (see OnboardingScreen.kt) — a node further down than the viewport
+        // needs scrolling into view before "is displayed" is meaningful; that's what performScrollTo is for.
+        compose.onNodeWithTag("onboarding_sms_grant").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun defaultSmsRoleButtonDisabledUntilSmsPermissionsGranted() {
         setContent(smsSupported = true, smsPermissionsGranted = false)
 
-        compose.onNodeWithTag("onboarding_sms_default").assertIsNotEnabled()
+        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsNotEnabled()
     }
 
     @Test
@@ -113,7 +116,7 @@ class OnboardingScreenContentTest {
             onRequestDefaultSmsRole = { requests++ },
         )
 
-        compose.onNodeWithTag("onboarding_sms_default").assertIsEnabled()
+        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsEnabled()
         compose.onNodeWithTag("onboarding_sms_default").performClick()
         assertEquals(1, requests)
     }
@@ -122,6 +125,6 @@ class OnboardingScreenContentTest {
     fun defaultSmsRoleButtonDisabledOnceAlreadyDefault() {
         setContent(smsSupported = true, smsPermissionsGranted = true, isDefaultSmsApp = true)
 
-        compose.onNodeWithTag("onboarding_sms_default").assertIsNotEnabled()
+        compose.onNodeWithTag("onboarding_sms_default").performScrollTo().assertIsNotEnabled()
     }
 }
