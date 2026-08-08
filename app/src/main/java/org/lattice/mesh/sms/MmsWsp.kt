@@ -56,30 +56,47 @@ object MmsWsp {
      */
     fun parseNotificationInd(pdu: ByteArray): MmsNotification? {
         val cursor = Cursor(pdu)
-        var messageType: Int? = null
-        var transactionId: String? = null
-        var contentLocation: String? = null
-        var failed = false
+        val state = ParseState()
+        while (cursor.hasNext() && !state.isDone()) {
+            if (!state.apply(readField(cursor))) break
+        }
+        return state.result()
+    }
 
-        fun haveBothFields() = transactionId != null && contentLocation != null
+    /**
+     * Accumulates [FieldOutcome]s across the loop in [parseNotificationInd] — kept as its own tiny class so
+     * that function stays a plain "loop until done" shape and this is where the actual field-by-field
+     * branching (and the eventual success/failure verdict) lives.
+     */
+    private class ParseState {
+        private var messageType: Int? = null
+        private var transactionId: String? = null
+        private var contentLocation: String? = null
+        private var failed = false
 
-        while (!failed && cursor.hasNext() && !haveBothFields()) {
-            when (val outcome = readField(cursor)) {
+        fun isDone(): Boolean = failed || (transactionId != null && contentLocation != null)
+
+        /** Applies one field outcome; returns false once parsing should stop (a failure was hit). */
+        fun apply(outcome: FieldOutcome): Boolean {
+            when (outcome) {
                 is FieldOutcome.MessageType -> messageType = outcome.value
                 is FieldOutcome.TransactionId -> transactionId = outcome.value
                 is FieldOutcome.ContentLocation -> contentLocation = outcome.value
                 FieldOutcome.Skip -> Unit
                 FieldOutcome.Failed -> failed = true
             }
+            return !failed
         }
 
-        if (failed || messageType != MESSAGE_TYPE_NOTIFICATION_IND) return null
-        val tid = transactionId ?: return null
-        val loc = contentLocation ?: return null
-        return MmsNotification(tid, loc)
+        fun result(): MmsNotification? {
+            if (failed || messageType != MESSAGE_TYPE_NOTIFICATION_IND) return null
+            val tid = transactionId ?: return null
+            val loc = contentLocation ?: return null
+            return MmsNotification(tid, loc)
+        }
     }
 
-    /** One header field's decode result — keeps [parseNotificationInd]'s own branching to a single `when`. */
+    /** One header field's decode result — keeps [ParseState.apply]'s own branching to a single `when`. */
     private sealed interface FieldOutcome {
         data class MessageType(
             val value: Int,
