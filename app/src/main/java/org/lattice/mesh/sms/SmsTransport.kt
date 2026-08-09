@@ -37,16 +37,20 @@ import java.util.concurrent.ConcurrentHashMap
  * Scope: **text-only, single-part-and-concatenated SMS**, addressed to peers who already have a
  * [org.lattice.data.peer.PeerEntity.phoneNumber] attached (mesh-bootstrapped, out-of-band-verified
  * contacts). Explicitly NOT in scope (see design notes' "open questions" and the batch 4 reversal note):
- *  - MMS / [sendFile] — always returns false. Tried claiming the Android default-SMS-app role for this in
- *    batch 3 and reverted it in batch 4: that role would let Lattice become the default SMS app, but with
- *    no compose or conversation UI for plain (non-Lattice) SMS/MMS, the user's actual texting experience
- *    would break — no way to send a normal text, no way to read one they receive. Reverted rather than ship
- *    that. This transport now deliberately stays a **non-default** `RECEIVE_SMS` holder: a plain
+ *  - MMS / [sendFile] — always returns false, **permanently, by design** (not deferred — see design notes'
+ *    "sendFile (permanently out of scope)" for the decision). SMS itself tops out around ~1600 characters
+ *    via concatenated-SMS UDH, nowhere near enough for a real file; actual binary transfer over the carrier
+ *    means MMS, which is hard-gated behind the Android default-SMS-app role. That role was claimed in
+ *    batch 3 and reverted in batch 4: with no compose or conversation UI for plain (non-Lattice) SMS/MMS,
+ *    the user's actual texting experience would break — no way to send a normal text, no way to read one
+ *    they receive. This transport now deliberately stays a **non-default** `RECEIVE_SMS` holder: a plain
  *    dynamically-registered receiver gets a courtesy copy of every incoming SMS broadcast (what any app
  *    holding `RECEIVE_SMS` gets, default or not) while the phone's actual default SMS app keeps working
  *    completely untouched, in parallel — no persistence contract, no safety net, no risk to the user's
- *    normal texting. If MMS support and a real "use it like an SMS app" experience get built later, that's
- *    a substantial, deliberate UI project (conversation list, compose screen) — see design notes.
+ *    normal texting. Chunking a file across many concatenated SMS segments instead of MMS was considered
+ *    and rejected: slow, per-segment carrier cost, and a real risk of tripping carrier spam/abuse filters.
+ *    SMS transport is text-only; a file sent to a peer reachable only over SMS silently doesn't go — same
+ *    as it does today.
  *  - SMS-only contact bootstrapping (a peer with a phone number but no `pubKey` yet). [neighbors]/[reachable]
  *    only ever surface peers that already have both, same as every other transport's trust model.
  *
@@ -148,7 +152,11 @@ class SmsTransport(
         }
     }
 
-    // MMS/large-payload transfer is out of scope — see class doc for why (default-SMS-app role reverted).
+    /**
+     * Always false. Permanently out of scope for this transport, not deferred — see the class doc and
+     * design notes for why (MMS needs the default-SMS-app role, reverted in batch 4 for UX reasons; SMS
+     * itself can't carry a real file; chunking over concatenated SMS was considered and rejected).
+     */
     override suspend fun sendFile(
         file: File,
         to: Peer,

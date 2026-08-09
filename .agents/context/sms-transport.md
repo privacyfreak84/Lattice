@@ -61,16 +61,33 @@ skips a peer with no number the same way any transport skips a peer it can't rea
   "attacker-resistant" rather than a trust-on-first-use downgrade from what mesh already does? Still open;
   `SmsTransport` (batch 2) only ever surfaces peers that already have both a `phoneNumber` and a pinned
   `pubKey`, same trust model as every other transport — an SMS-only contact simply isn't representable yet.
-- **MMS / large payloads.** Tried and reverted — see the batch 4 entry below. Still no MMS.
 - **Default SMS app.** Decided (batch 2), reverted to that decision after a batch 3 detour: **not
   claimed.** `SmsTransport` registers only a dynamic `BroadcastReceiver` for `SMS_RECEIVED_ACTION`, which
   any app holding `RECEIVE_SMS` gets regardless of default-app status. This is the smaller ask and enough
   for send/receive of Lattice's own traffic; it does *not* get us MMS, reliable interception ahead of the
   real default SMS app, or the ability to suppress the system "message sent" UI chrome. Batch 3 claimed the
   role anyway to get MMS; batch 4 reverted it once it became clear that without a real plain-SMS
-  conversation UI, claiming the role breaks the user's actual texting rather than adding to it. Revisit only
-  alongside a genuine "Lattice as a full SMS app" UI project — see the batch 4 entry.
+  conversation UI, claiming the role breaks the user's actual texting rather than adding to it. See the
+  `sendFile` section below for why this is now a *permanent* stance, not just the current one.
 - **Dres's `ContactsStore.kt`** — still unresolved, not touched by batch 2.
+
+## `sendFile` (permanently out of scope)
+
+Was listed under "open questions" as needing per-recipient `MessageCrypto`-style encryption wired in
+(batch 3 entry below). That framing turned out to be wrong: encryption was never the blocker. SMS itself
+tops out around ~1600 characters via concatenated-SMS UDH — nowhere near enough for a real file — so
+`sendFile` actually needs MMS, and MMS is hard-gated behind the Android default-SMS-app role. That's the
+exact role batch 3 claimed and batch 4 reverted, for the same UX reason as before (no plain-SMS
+conversation/compose UI ⇒ claiming the role breaks the user's real texting). Re-implementing `sendFile` for
+real would mean re-opening that decision, not just adding a crypto call.
+
+Considered and explicitly rejected: chunking a file across many concatenated SMS segments instead of MMS.
+Technically avoids the default-app role, but is slow, costs real per-segment carrier fees, and risks
+tripping carrier spam/abuse filters on a message train that looks nothing like normal texting.
+
+**Decision: `sendFile` stays permanently `false` for this transport.** SMS mesh fallback is text-only —
+not a temporary gap, an accepted scope boundary. Documented in `SmsTransport`'s class doc and the
+`sendFile` override itself so a future session doesn't re-litigate this as an oversight.
 
 ## Phone number normalization (resolved)
 
@@ -182,8 +199,11 @@ MMS, or refuse and tell the user) is still an open call for whenever MMS lands.
   claiming the role broke the user's actual texting rather than adding to it.
 - ~~`MmsWapPushReceiver` doesn't wait for the download to finish before reading parts back.~~ Moot —
   `MmsWapPushReceiver` (and MMS entirely) was removed in batch 4.
-- **`sendFile`** — still open, unrelated to the MMS revert. Needs per-recipient encryption wired in before
-  any transport-level file send would be safe; not specific to SMS/MMS.
+- ~~`sendFile` — still open, unrelated to the MMS revert. Needs per-recipient encryption wired in before
+  any transport-level file send would be safe; not specific to SMS/MMS.~~ Wrong framing, corrected in a
+  later session — see "`sendFile` (permanently out of scope)" above. Encryption was never the blocker;
+  SMS itself can't carry a file at all, so `sendFile` needs MMS, which needs the very default-SMS-app role
+  this batch reverted. Decided permanently `false`, not deferred pending a crypto pass.
 
 ## Batch 4: reverted the default-SMS-app role, removed MMS
 
