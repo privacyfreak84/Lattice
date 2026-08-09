@@ -59,7 +59,7 @@ fun PhoneNumberSection(
             value = draft,
             onValueChange = { draft = it },
             modifier = Modifier.fillMaxWidth().testTag("phone_number_field"),
-            label = { Text(stringResource(R.string.profile_details_phone_title)) },
+            label = { Text(stringResource(R.string.profile_details_phone_label)) },
             placeholder = { Text(stringResource(R.string.profile_details_phone_hint)) },
             singleLine = true,
         )

@@ -1,6 +1,5 @@
 package org.lattice.ui.profile
 
-import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

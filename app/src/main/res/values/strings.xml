@@ -255,6 +255,7 @@
 
     <!-- SMS routing number (attach/remove on a peer's profile) -->
     <string name="profile_details_phone_title">SMS fallback</string>
+    <string name="profile_details_phone_label">Phone number</string>
     <string name="profile_details_phone_caption">Add %1$s\'s phone number so you can still reach them over SMS if you\'re both out of mesh range. This doesn\'t affect encryption or verification.</string>
     <string name="profile_details_phone_hint">+15551234567</string>
     <string name="profile_details_phone_save">Save</string>
