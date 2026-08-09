@@ -1,5 +1,6 @@
 package org.lattice.ui.profile
 
+import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -132,5 +134,57 @@ class ProfileDetailsViewModelTest {
 
             coVerify { settings.block(nodeId, "tag-1") }
             assertFalse("scan result starts empty", vm.scanResult.value == VerifyScanResult.MATCH)
+        }
+
+    @Test
+    fun setPhoneNumberWithAValidNumberNormalizesPersistsAndReportsSaved() =
+        runTest {
+            val vm = vm()
+
+            // 2015550123 is libphonenumber's own documented example number for a US fixed line (see
+            // PhoneNumberNormalizerTest for why NOT to use 555 as the area code itself).
+            vm.setPhoneNumber("+1 (201) 555-0123")
+            advanceUntilIdle()
+
+            coVerify { peers.setPhoneNumber(nodeId, "+12015550123") }
+            assertEquals(PhoneNumberEditResult.SAVED, vm.phoneNumberResult.value)
+        }
+
+    @Test
+    fun setPhoneNumberWithNoCountryCodeIsRejectedRatherThanGuessingARegion() =
+        runTest {
+            val vm = vm()
+
+            // No default region is applied (see setPhoneNumber's doc) — a national-format number with no
+            // leading '+' can't be resolved to a country and must be rejected, not silently guessed.
+            vm.setPhoneNumber("201-555-0123")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { peers.setPhoneNumber(any(), any()) }
+            assertEquals(PhoneNumberEditResult.INVALID, vm.phoneNumberResult.value)
+        }
+
+    @Test
+    fun clearPhoneNumberPersistsNull() =
+        runTest {
+            val vm = vm()
+
+            vm.clearPhoneNumber()
+            advanceUntilIdle()
+
+            coVerify { peers.setPhoneNumber(nodeId, null) }
+        }
+
+    @Test
+    fun consumePhoneNumberResultClearsTheOneShotFlag() =
+        runTest {
+            val vm = vm()
+
+            vm.setPhoneNumber("not a number")
+            advanceUntilIdle()
+            assertEquals(PhoneNumberEditResult.INVALID, vm.phoneNumberResult.value)
+
+            vm.consumePhoneNumberResult()
+            assertNull(vm.phoneNumberResult.value)
         }
 }

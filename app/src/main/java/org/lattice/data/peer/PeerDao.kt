@@ -22,6 +22,17 @@ interface PeerDao {
         verified: Boolean,
     )
 
+    /**
+     * Attaches (or, with null, removes) a peer's SMS routing number. Not a trust event — deliberately
+     * separate from [setVerified] and never touches [PeerEntity.pubKey]/[PeerEntity.verified] — see
+     * [PeerEntity.phoneNumber]'s doc.
+     */
+    @Query("UPDATE peers SET phoneNumber = :phoneNumber WHERE nodeId = :nodeId")
+    suspend fun setPhoneNumber(
+        nodeId: String,
+        phoneNumber: String?,
+    )
+
     /** How many peers reference avatar blob [hash] — part of the orphaned-blob garbage-collection check. */
     @Query("SELECT COUNT(*) FROM peers WHERE avatarHash = :hash")
     suspend fun countByAvatarHash(hash: String): Int

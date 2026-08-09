@@ -17,9 +17,13 @@ import org.lattice.identity.displayNameFor
 import org.lattice.mesh.MeshController
 import org.lattice.mesh.crypto.SafetyNumber
 import org.lattice.mesh.crypto.VerifyPayload
+import org.lattice.mesh.sms.PhoneNumberNormalizer
 
 /** The result of scanning a peer's identity QR, surfaced once to the screen then consumed. */
 enum class VerifyScanResult { MATCH, MISMATCH }
+
+/** The result of attempting to save a manually-entered phone number, surfaced once then consumed. */
+enum class PhoneNumberEditResult { SAVED, INVALID }
 
 /** This device's identity, loaded once for safety-number/QR rendering. */
 private data class MyIdentity(
@@ -41,6 +45,8 @@ data class ProfileDetailsUiState(
     val verified: Boolean = false,
     val safetyNumber: String? = null,
     val myQrPayload: String? = null,
+    // SMS routing number (E.164), null if none attached — see PeerEntity.phoneNumber.
+    val phoneNumber: String? = null,
 )
 
 /**
@@ -60,6 +66,9 @@ class ProfileDetailsViewModel(
 
     private val _scanResult = MutableStateFlow<VerifyScanResult?>(null)
     val scanResult: StateFlow<VerifyScanResult?> = _scanResult.asStateFlow()
+
+    private val _phoneNumberResult = MutableStateFlow<PhoneNumberEditResult?>(null)
+    val phoneNumberResult: StateFlow<PhoneNumberEditResult?> = _phoneNumberResult.asStateFlow()
 
     // Latest pinned key for the peer, captured for the scan comparison (avoids re-reading the DB).
     @Volatile
@@ -103,6 +112,7 @@ class ProfileDetailsViewModel(
                 verified = peer?.verified == true,
                 safetyNumber = safety,
                 myQrPayload = myId?.let { VerifyPayload.encode(it.nodeId, it.bundle) },
+                phoneNumber = peer?.phoneNumber,
             )
         }.stateIn(
             viewModelScope,
@@ -161,5 +171,32 @@ class ProfileDetailsViewModel(
 
     fun consumeScanResult() {
         _scanResult.value = null
+    }
+
+    /**
+     * Validates and normalizes [raw] to E.164 (see [org.lattice.mesh.sms.PhoneNumberNormalizer]) and, on
+     * success, attaches it to this peer — reachable over SMS from here on (see
+     * [org.lattice.mesh.sms.SmsTransport]). No default region is applied: this is a specific *other*
+     * person's number, possibly in a different country than the local SIM, so guessing a region would
+     * risk silently normalizing to the wrong country rather than just asking for the `+` country code.
+     * On failure, nothing is persisted — [phoneNumberResult] reports which happened.
+     */
+    fun setPhoneNumber(raw: String) {
+        val normalized = PhoneNumberNormalizer.normalize(raw, defaultRegion = null)
+        if (normalized == null) {
+            _phoneNumberResult.value = PhoneNumberEditResult.INVALID
+            return
+        }
+        viewModelScope.launch { peers.setPhoneNumber(nodeId, normalized) }
+        _phoneNumberResult.value = PhoneNumberEditResult.SAVED
+    }
+
+    /** Detaches this peer's phone number — not a trust event, same as attaching one. */
+    fun clearPhoneNumber() {
+        viewModelScope.launch { peers.setPhoneNumber(nodeId, null) }
+    }
+
+    fun consumePhoneNumberResult() {
+        _phoneNumberResult.value = null
     }
 }

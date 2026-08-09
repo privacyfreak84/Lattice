@@ -47,6 +47,20 @@ class PeerDaoTest : RoomDbTest() {
         }
 
     @Test
+    fun `setPhoneNumber attaches and, with null, removes the number without touching pubKey or verified`() =
+        runTest {
+            dao.upsert(PeerEntity(nodeId = "a", pubKey = "KEY", verified = true))
+            dao.setPhoneNumber("a", "+15551234567")
+            dao.findByNodeId("a")!!.let {
+                assertEquals("+15551234567", it.phoneNumber)
+                assertEquals("KEY", it.pubKey) // untouched
+                assertTrue(it.verified) // untouched — attaching a number is not a trust event
+            }
+            dao.setPhoneNumber("a", null)
+            assertNull(dao.findByNodeId("a")!!.phoneNumber)
+        }
+
+    @Test
     fun `countByAvatarHash counts peers referencing that avatar blob`() =
         runTest {
             dao.upsert(PeerEntity(nodeId = "a", avatarHash = "h1"))

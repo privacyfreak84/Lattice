@@ -26,6 +26,16 @@ class PeerRepository(
         verified: Boolean,
     ) = dao.setVerified(nodeId, verified)
 
+    /**
+     * Attaches (or, with null, removes) this peer's SMS routing number — see [PeerEntity.phoneNumber].
+     * Callers are expected to have already normalized [phoneNumber] to E.164 (see
+     * [org.lattice.mesh.sms.PhoneNumberNormalizer]); this method itself does no validation.
+     */
+    suspend fun setPhoneNumber(
+        nodeId: String,
+        phoneNumber: String?,
+    ) = dao.setPhoneNumber(nodeId, phoneNumber)
+
     /** Node ids the user has out-of-band verified — exempt from [sweepCap] and the message-request queue. */
     suspend fun verifiedNodeIds(): List<String> = dao.verifiedNodeIds()
 

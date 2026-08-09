@@ -73,6 +73,7 @@ fun ProfileDetailsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val scanResult by viewModel.scanResult.collectAsStateWithLifecycle()
+    val phoneNumberResult by viewModel.phoneNumberResult.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val matchMessage = stringResource(R.string.verify_match)
@@ -84,6 +85,17 @@ fun ProfileDetailsScreen(
             null -> Unit
         }
         if (scanResult != null) viewModel.consumeScanResult()
+    }
+
+    val phoneSavedMessage = stringResource(R.string.profile_details_phone_saved)
+    val phoneInvalidMessage = stringResource(R.string.profile_details_phone_invalid)
+    LaunchedEffect(phoneNumberResult) {
+        when (phoneNumberResult) {
+            PhoneNumberEditResult.SAVED -> snackbarHostState.showSnackbar(phoneSavedMessage)
+            PhoneNumberEditResult.INVALID -> snackbarHostState.showSnackbar(phoneInvalidMessage)
+            null -> Unit
+        }
+        if (phoneNumberResult != null) viewModel.consumePhoneNumberResult()
     }
 
     // The scanner takes over the whole screen rather than launching an Activity — see [QrScanner].
@@ -112,6 +124,8 @@ fun ProfileDetailsScreen(
             onUnblock = viewModel::unblock,
             onMarkVerified = viewModel::markVerified,
             onClearVerification = viewModel::clearVerification,
+            onSavePhoneNumber = viewModel::setPhoneNumber,
+            onRemovePhoneNumber = viewModel::clearPhoneNumber,
         )
     }
 }
@@ -128,6 +142,8 @@ internal fun ProfileDetailsScreenContent(
     onUnblock: () -> Unit,
     onMarkVerified: () -> Unit,
     onClearVerification: () -> Unit,
+    onSavePhoneNumber: (String) -> Unit,
+    onRemovePhoneNumber: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showAvatarFullscreen by remember { mutableStateOf(false) }
@@ -281,6 +297,18 @@ internal fun ProfileDetailsScreenContent(
                 onMarkVerified = onMarkVerified,
                 onClearVerification = onClearVerification,
             )
+
+            // Gated on hasKey, not verified — see PhoneNumberSection's doc for why: a phone number with
+            // no key to encrypt to could never actually route over SmsTransport.
+            if (state.hasKey) {
+                HorizontalDivider()
+                PhoneNumberSection(
+                    displayName = state.displayName,
+                    phoneNumber = state.phoneNumber,
+                    onSave = onSavePhoneNumber,
+                    onRemove = onRemovePhoneNumber,
+                )
+            }
         }
     }
 
@@ -320,6 +348,8 @@ fun ProfileDetailsScreenOnlineVerifiedPreview() =
             onUnblock = {},
             onMarkVerified = {},
             onClearVerification = {},
+            onSavePhoneNumber = {},
+            onRemovePhoneNumber = {},
         )
     }
 
@@ -349,6 +379,8 @@ fun ProfileDetailsScreenOfflinePreview() =
             onUnblock = {},
             onMarkVerified = {},
             onClearVerification = {},
+            onSavePhoneNumber = {},
+            onRemovePhoneNumber = {},
         )
     }
 
@@ -379,5 +411,7 @@ fun ProfileDetailsScreenNoKeyPreview() =
             onUnblock = {},
             onMarkVerified = {},
             onClearVerification = {},
+            onSavePhoneNumber = {},
+            onRemovePhoneNumber = {},
         )
     }

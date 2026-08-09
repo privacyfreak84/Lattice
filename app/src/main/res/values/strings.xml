@@ -253,6 +253,15 @@
     <string name="verify_match">Verified — keys match.</string>
     <string name="verify_mismatch">Codes don\'t match. This may not be the right contact.</string>
 
+    <!-- SMS routing number (attach/remove on a peer's profile) -->
+    <string name="profile_details_phone_title">SMS fallback</string>
+    <string name="profile_details_phone_caption">Add %1$s\'s phone number so you can still reach them over SMS if you\'re both out of mesh range. This doesn\'t affect encryption or verification.</string>
+    <string name="profile_details_phone_hint">+15551234567</string>
+    <string name="profile_details_phone_save">Save</string>
+    <string name="profile_details_phone_remove">Remove</string>
+    <string name="profile_details_phone_saved">Phone number saved.</string>
+    <string name="profile_details_phone_invalid">That doesn\'t look like a valid phone number. Include the country code, e.g. +15551234567.</string>
+
     <!-- Standalone "Verify contact" screen (chat-list overflow) -->
     <string name="verify_contact_title">Verify contact</string>
     <string name="verify_standalone_caption">Show your code to someone nearby, or scan theirs, to add them as a verified contact — even if you\'ve never chatted.</string>
