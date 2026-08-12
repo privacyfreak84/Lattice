@@ -5,6 +5,8 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
+// A data-access interface: one method per query, so the count naturally exceeds detekt's interface limit.
+@Suppress("TooManyFunctions")
 @Dao
 interface PeerDao {
     @Query("SELECT * FROM peers ORDER BY name ASC")
@@ -31,6 +33,13 @@ interface PeerDao {
     suspend fun setPhoneNumber(
         nodeId: String,
         phoneNumber: String?,
+    )
+
+    /** Records that we just sent our own profile directly to this peer — see [PeerEntity.profileSentAt]. */
+    @Query("UPDATE peers SET profileSentAt = :sentAt WHERE nodeId = :nodeId")
+    suspend fun setProfileSentAt(
+        nodeId: String,
+        sentAt: Long,
     )
 
     /** How many peers reference avatar blob [hash] — part of the orphaned-blob garbage-collection check. */

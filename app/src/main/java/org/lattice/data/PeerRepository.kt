@@ -36,6 +36,12 @@ class PeerRepository(
         phoneNumber: String?,
     ) = dao.setPhoneNumber(nodeId, phoneNumber)
 
+    /** Records that we just sent our own profile directly to this peer — see [PeerEntity.profileSentAt]. */
+    suspend fun setProfileSentAt(
+        nodeId: String,
+        sentAt: Long,
+    ) = dao.setProfileSentAt(nodeId, sentAt)
+
     /** Node ids the user has out-of-band verified — exempt from [sweepCap] and the message-request queue. */
     suspend fun verifiedNodeIds(): List<String> = dao.verifiedNodeIds()
 

@@ -61,6 +61,19 @@ class PeerDaoTest : RoomDbTest() {
         }
 
     @Test
+    fun `setProfileSentAt records when we last sent our own profile without touching pubKey or verified`() =
+        runTest {
+            dao.upsert(PeerEntity(nodeId = "a", pubKey = "KEY", verified = true, phoneNumber = "+15551234567"))
+            assertNull("starts unset", dao.findByNodeId("a")!!.profileSentAt)
+            dao.setProfileSentAt("a", 1_700_000_000_000L)
+            dao.findByNodeId("a")!!.let {
+                assertEquals(1_700_000_000_000L, it.profileSentAt)
+                assertEquals("KEY", it.pubKey) // untouched
+                assertTrue(it.verified) // untouched
+            }
+        }
+
+    @Test
     fun `countByAvatarHash counts peers referencing that avatar blob`() =
         runTest {
             dao.upsert(PeerEntity(nodeId = "a", avatarHash = "h1"))
