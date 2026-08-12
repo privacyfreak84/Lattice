@@ -31,7 +31,10 @@ import org.lattice.data.reaction.ReactionEntity
     //     time (caught by LatticeDatabaseMigrationTest), never a silent wipe of a user's messages/custody/pins.
     // v2: peers.phoneNumber (nullable) — SMS/MMS carrier-transport addressing. See KnitMigrations.MIGRATION_1_2
     //     and PeerEntity's doc comment.
-    version = 2,
+    // v3: peers.profileSentAt (nullable) — when we last sent our own profile directly to an SMS-only peer's
+    //     number, so the SMS first-contact handshake knows whether we've reciprocated yet. See
+    //     KnitMigrations.MIGRATION_2_3 and PeerEntity's doc comment.
+    version = 3,
     // Export the schema JSON to app/schemas/ (location set by the androidx.room Gradle plugin's
     // room { schemaDirectory(...) } in app/build.gradle.kts). Keeps the schema diffable in review and feeds
     // the migration test's MigrationTestHelper. Room also errors at compile time if an entity changes without

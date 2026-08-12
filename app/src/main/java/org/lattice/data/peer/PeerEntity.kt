@@ -29,6 +29,14 @@ import androidx.room.PrimaryKey
  * transport has no route to this peer and skips it. Unlike [pubKey], attaching or changing a number is
  * not itself a trust event; the existing [verified] flag (safety number / QR, tied to [pubKey]) is what
  * carries authentication, and continues to gate it regardless of which transport a message rides.
+ *
+ * [profileSentAt] is when we last sent *our own* profile directly to this peer's [phoneNumber] (epoch
+ * millis; see `org.lattice.mesh.SmsBootstrap`) — distinct from mesh, which broadcasts our profile to
+ * every neighbor automatically with no gating, so this field is only ever meaningful for an SMS-reachable
+ * peer. Null means we haven't yet: either they contacted us first over SMS and we haven't accepted (in
+ * which case they're pinned, unverified, but can't decrypt anything from us until we reply), or the row
+ * predates this field. Set the moment we send, not once we've confirmed they received it — matches
+ * [PeerEntity]'s general pattern of recording an action taken, not its outcome.
  */
 @Entity(tableName = "peers")
 data class PeerEntity(
@@ -43,4 +51,5 @@ data class PeerEntity(
     val capabilities: Long? = null,
     val updatedAt: Long = 0L,
     val phoneNumber: String? = null,
+    val profileSentAt: Long? = null,
 )

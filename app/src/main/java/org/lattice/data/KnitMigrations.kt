@@ -29,6 +29,19 @@ object KnitMigrations {
             }
         }
 
+    /**
+     * Adds `peers.profileSentAt` (nullable INTEGER, epoch millis) — when we last sent our own profile
+     * directly to an SMS-only peer's number, for the SMS first-contact handshake; see
+     * [org.lattice.data.peer.PeerEntity]. Every existing row gets `NULL` — exactly right for a pre-existing
+     * peer, since none of them are mid-SMS-handshake by definition (this field didn't exist for them to be).
+     */
+    val MIGRATION_2_3: Migration =
+        object : Migration(2, 3) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.prepare("ALTER TABLE peers ADD COLUMN profileSentAt INTEGER").use { it.step() }
+            }
+        }
+
     /** All migrations, applied by Room in order. */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

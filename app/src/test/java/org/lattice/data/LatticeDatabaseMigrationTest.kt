@@ -14,8 +14,8 @@ import java.io.File
 /**
  * Migration-testing harness. **v1 is the frozen launch baseline:** there is no destructive fallback, and from
  * v1 forward every schema bump ships a tested [KnitMigrations] entry validated here — `MIGRATION_1_2` (v2:
- * `peers.phoneNumber`, see [org.lattice.data.peer.PeerEntity]) is the first one. `createDatabase(version)`
- * rebuilds the DB from the
+ * `peers.phoneNumber`) and `MIGRATION_2_3` (v3: `peers.profileSentAt`), both on
+ * [org.lattice.data.peer.PeerEntity]. `createDatabase(version)` rebuilds the DB from the
  * checked-in `app/schemas/org.lattice.data.LatticeDatabase/<version>.json`, proving `exportSchema`, the Room
  * Gradle plugin's `schemaDirectory` export, the unit-test asset wiring (Robolectric serves `sourceSets["test"]`
  * assets), and the `MigrationTestHelper` harness all line up. The version below is hardcoded rather than read
@@ -43,8 +43,8 @@ class LatticeDatabaseMigrationTest {
         )
 
     @Test
-    fun `the current schema (v2) creates and opens from the exported JSON`() {
-        val version = 2 // LatticeDatabase @Database(version = 2) — bump alongside the DB (its retention is CLASS,
+    fun `the current schema (v3) creates and opens from the exported JSON`() {
+        val version = 3 // LatticeDatabase @Database(version = 3) — bump alongside the DB (its retention is CLASS,
         // so the version can't be read reflectively). A missing schemas/<db>/<version>.json fails here.
         helper.createDatabase(version).close()
     }
@@ -69,6 +69,33 @@ class LatticeDatabaseMigrationTest {
             c.prepare("SELECT phoneNumber FROM peers WHERE nodeId = 'n1'").use { s ->
                 assertTrue(s.step())
                 assertEquals("+15551234567", s.getText(0))
+            }
+        }
+    }
+
+    @Test
+    fun `migrate 2 to 3 preserves peer rows and adds a nullable profileSentAt column`() {
+        helper.createDatabase(2).use { c ->
+            c
+                .prepare(
+                    "INSERT INTO peers (nodeId, name, status, verified, updatedAt, phoneNumber) " +
+                        "VALUES ('n1','Ann','',0,0,'+15551234567')",
+                ).use { it.step() }
+        }
+        helper.runMigrationsAndValidate(3, listOf(KnitMigrations.MIGRATION_2_3)).use { c ->
+            // The pre-existing row (and its v2 phoneNumber) survived, and the new column defaulted to NULL
+            // ("haven't sent them our profile yet" — see PeerEntity's doc comment), not to 0.
+            c.prepare("SELECT name, phoneNumber, profileSentAt FROM peers WHERE nodeId = 'n1'").use { s ->
+                assertTrue(s.step())
+                assertEquals("Ann", s.getText(0))
+                assertEquals("+15551234567", s.getText(1))
+                assertTrue(s.isNull(2))
+            }
+            // The column actually accepts and round-trips a real value once we send our profile.
+            c.prepare("UPDATE peers SET profileSentAt = 1700000000000 WHERE nodeId = 'n1'").use { it.step() }
+            c.prepare("SELECT profileSentAt FROM peers WHERE nodeId = 'n1'").use { s ->
+                assertTrue(s.step())
+                assertEquals(1700000000000L, s.getLong(0))
             }
         }
     }
