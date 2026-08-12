@@ -19,12 +19,15 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.lattice.data.PeerRepository
+import org.lattice.identity.NodeId
 import org.lattice.mesh.FileMeta
 import org.lattice.mesh.InboundFrame
 import org.lattice.mesh.MeshTransport
 import org.lattice.mesh.Peer
 import org.lattice.mesh.ReceivedFile
 import org.lattice.mesh.TransportHealth
+import org.lattice.mesh.protocol.FrameType
+import org.lattice.mesh.protocol.ProfileContent
 import org.lattice.mesh.protocol.WireCodec
 import org.lattice.mesh.protocol.WireEnvelope
 import java.io.File
@@ -34,9 +37,20 @@ import java.util.concurrent.ConcurrentHashMap
  * [MeshTransport] over the SMS carrier — see `.agents/context/sms-transport.md` for the design rationale
  * and this batch's open questions.
  *
- * Scope: **text-only, single-part-and-concatenated SMS**, addressed to peers who already have a
- * [org.lattice.data.peer.PeerEntity.phoneNumber] attached (mesh-bootstrapped, out-of-band-verified
- * contacts). Explicitly NOT in scope (see design notes' "open questions" and the batch 4 reversal note):
+ * Scope: **text-only, single-part-and-concatenated SMS**. A frame from a peer who already has a
+ * [org.lattice.data.peer.PeerEntity.phoneNumber] attached routes normally. A frame from an *unknown*
+ * number is not rejected at this layer, though — [onSmsReceived] resolves `fromNodeId` from the wire
+ * envelope's self-asserted `senderId`, the same as every other transport, and lets the shared
+ * `InboundPipeline.verifyInbound`/`handleProfile` decide: a genuine self-certifying `FrameType.PROFILE`
+ * (its key actually hashes to the claimed nodeId) gets trust-on-first-use pinned as a brand-new,
+ * unverified peer — this transport's half of SMS-only contact bootstrapping (see `SmsBootstrap` for the
+ * other half: sending our own profile to a stranger's number in the first place, and the explicit-accept
+ * gate before replying to one who contacted us). Anything else from an unknown number — a CHAT frame, a
+ * forged PROFILE — fails verification downstream exactly as it always has and is dropped there, not here.
+ * [pendingPhoneNumberFor] is this transport's own contribution to that bootstrap: attaching the SMS
+ * number a first-contact PROFILE arrived from to the peer row once (and only once) it gets pinned.
+ *
+ * Explicitly NOT in scope (see design notes' "open questions" and the batch 4 reversal note):
  *  - MMS / [sendFile] — always returns false, **permanently, by design** (not deferred — see design notes'
  *    "sendFile (permanently out of scope)" for the decision). SMS itself tops out around ~1600 characters
  *    via concatenated-SMS UDH, nowhere near enough for a real file; actual binary transfer over the carrier
@@ -51,8 +65,6 @@ import java.util.concurrent.ConcurrentHashMap
  *    and rejected: slow, per-segment carrier cost, and a real risk of tripping carrier spam/abuse filters.
  *    SMS transport is text-only; a file sent to a peer reachable only over SMS silently doesn't go — same
  *    as it does today.
- *  - SMS-only contact bootstrapping (a peer with a phone number but no `pubKey` yet). [neighbors]/[reachable]
- *    only ever surface peers that already have both, same as every other transport's trust model.
  *
  * [health] reflects permission + SIM presence only — there's no "radio" to be degraded the way Bluetooth/
  * Wi-Fi Aware can be (see design notes: "not anything dynamic"), so it's computed once in [start] rather
@@ -71,10 +83,38 @@ class SmsTransport(
     // dual-SIM subscription-specific manager is out of scope for this batch.
     private val smsManager: SmsManager? = runCatching { SmsManager.getDefault() }.getOrNull()
 
-    // nodeId -> phoneNumber, refreshed from PeerRepository.observeWithPhoneNumber(). The routing table for
+    // nodeId -> phoneNumber, refreshed from PeerRepository.observePeers(). The routing table for
     // send()/neighbors/reachable; see the class doc for why this transport's notion of "neighbor" is
     // "has a number attached", not a live sighting.
     private val phoneNumberFor = ConcurrentHashMap<String, String>()
+
+    // nodeId -> the SMS number a first-contact PROFILE frame arrived from, for a sender that passed the
+    // cheap self-certification pre-check (key hashes to the claimed nodeId — see onSmsReceived) but whose
+    // peer row doesn't exist yet (pinning itself happens asynchronously, downstream, in handleProfile).
+    // Drained by the observeAll() collector below the moment that row appears: setPhoneNumber(nodeId, ...)
+    // then, not here, since attaching a number to a row that doesn't exist yet would be a silent no-op.
+    // Bounded + oldest-first-evicted like SeenSet/KeyExchange's `missing`: an entry here only ever required
+    // a cheap hash check, not a full signature verify, so it's not a free attack surface for someone who
+    // can send real SMS claiming arbitrary (self-consistent) keypairs — bounding it caps that cost regardless.
+    private val pendingPhoneNumberFor =
+        object : LinkedHashMap<String, String>(16, 0.75f, false) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > MAX_PENDING_PHONE_NUMBERS
+        }
+
+    @Synchronized
+    private fun recordPendingPhoneNumber(
+        nodeId: String,
+        phoneNumber: String,
+    ) {
+        pendingPhoneNumberFor[nodeId] = phoneNumber
+    }
+
+    /**
+     * Detaches and returns the pending number for [nodeId], or null if none — a fresh row isn't
+     * necessarily one we're bootstrapping.
+     */
+    @Synchronized
+    private fun takePendingPhoneNumber(nodeId: String): String? = pendingPhoneNumberFor.remove(nodeId)
 
     private val _neighbors = MutableStateFlow<Set<Peer>>(emptySet())
     override val neighbors = _neighbors.asStateFlow()
@@ -94,12 +134,24 @@ class SmsTransport(
     override fun start() {
         _health.value = computeHealth()
         peers
-            .observeWithPhoneNumber()
+            .observePeers()
             .onEach { rows ->
                 phoneNumberFor.clear()
                 val region = defaultRegion()
                 rows.forEach { row ->
-                    val number = row.phoneNumber ?: return@forEach
+                    val number = row.phoneNumber
+                    if (number == null) {
+                        // No number yet — if this is a peer we're bootstrapping via a first-contact SMS
+                        // PROFILE (see onSmsReceived/pendingPhoneNumberFor), attach it now that the row
+                        // exists. A peer that simply has no number (mesh-only, or the user removed one via
+                        // the profile screen's Remove button) has nothing pending and this is a no-op —
+                        // deliberately: re-attaching a number the user explicitly removed would override
+                        // their choice, so this only ever fires for a brand-new row's first attachment.
+                        takePendingPhoneNumber(row.nodeId)?.let { pending ->
+                            scope.launch { peers.setPhoneNumber(row.nodeId, pending) }
+                        }
+                        return@forEach
+                    }
                     val normalized = PhoneNumberNormalizer.normalize(number, region)
                     if (normalized == null) {
                         Log.w(TAG, "stored phoneNumber for ${row.nodeId} failed to normalize; excluding from SMS routing")
@@ -174,17 +226,38 @@ class SmsTransport(
         val bytes = SmsWireCodec.decode(text) ?: return
         val wire = WireCodec.decodeWire(bytes) ?: return
         val envelope = WireCodec.decodeEnvelope(wire.signed) ?: return
-        // Both sides of this comparison are normalized to E.164 through the same PhoneNumberNormalizer path
-        // (phoneNumberFor's values, set in start()'s observeWithPhoneNumber collector) — see that class doc
-        // for why. A sender address that fails to normalize (alphanumeric sender ID, malformed) can never
-        // match a real peer, so it falls through to the same "unrecognized number" outcome as a normalized
-        // sender with no matching entry.
-        val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion())
-        val fromNodeId =
-            normalizedSender
-                ?.let { ns -> phoneNumberFor.entries.firstOrNull { it.value == ns }?.key }
-                ?: return
+        // The claimed sender, same as every other transport — NOT cross-checked against phoneNumberFor
+        // (a first-contact PROFILE, by definition, comes from a sender we don't have a routing entry for
+        // yet). Real authentication happens downstream in InboundPipeline.verifyInbound, which drops
+        // anything whose signature doesn't verify against a key that actually hashes to this claimed id —
+        // exactly how Bluetooth/Wi-Fi Aware already trust a self-asserted senderId. This transport adds
+        // no new trust; it just stops gating receipt on a number it can't yet know.
+        val fromNodeId = envelope.senderId
+        maybeRecordPendingPhoneNumber(fromNodeId, envelope.type, envelope.payload, sender)
         scope.launch { _inbound.emit(InboundFrame(wire, envelope, fromNodeId)) }
+    }
+
+    /**
+     * If [type]/[payload] is a genuine first-contact [FrameType.PROFILE] — its key actually hashes to
+     * [fromNodeId] (the free, cheap half of what InboundPipeline's handleProfile will separately,
+     * asynchronously verify in full via signature) — and no peer row exists for [fromNodeId] yet, remembers
+     * [sender]'s normalized number so [start]'s collector can attach it the moment that row is pinned. Deliberately does nothing for an already-known [fromNodeId] (see [pendingPhoneNumberFor]'s
+     * doc for why re-attaching to an existing row would be wrong) or a sender address that fails to
+     * normalize (alphanumeric sender ID, malformed — can never be a real callback number anyway).
+     */
+    private fun maybeRecordPendingPhoneNumber(
+        fromNodeId: String,
+        type: String,
+        payload: ByteArray,
+        sender: String,
+    ) {
+        if (type != FrameType.PROFILE) return
+        val pubKey = WireCodec.decodePayload<ProfileContent>(payload)?.pubKey ?: return
+        if (NodeId.fromPublicKeyBundle(pubKey) != fromNodeId) return
+        val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion()) ?: return
+        scope.launch {
+            if (peers.find(fromNodeId) == null) recordPendingPhoneNumber(fromNodeId, normalizedSender)
+        }
     }
 
     // SIM country as the default region for parsing national-format (no leading '+') numbers — both the
@@ -212,6 +285,11 @@ class SmsTransport(
     companion object {
         private const val TAG = "SmsTransport"
         private const val SMS_RECEIVED_ACTION = "android.provider.Telephony.SMS_RECEIVED"
+
+        // Cap on pendingPhoneNumberFor — see its doc. Generous relative to a realistic burst of genuine
+        // first-contact attempts, small relative to what it'd cost an attacker to fill (each entry requires
+        // a real SMS plus a passing (if cheap) hash check).
+        private const val MAX_PENDING_PHONE_NUMBERS = 64
 
         /** True if this device has cellular telephony at all — gates whether [SmsTransport] is even built. */
         fun isSupported(context: Context): Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
