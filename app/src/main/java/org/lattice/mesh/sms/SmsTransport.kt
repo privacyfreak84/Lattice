@@ -192,17 +192,46 @@ class SmsTransport(
         wire: WireEnvelope,
         to: Peer?,
     ) {
-        val manager = smsManager ?: return
+        // Re-encodes per target via sendRaw rather than once up front — a deliberate small tradeoff for
+        // sharing the encode+send path with sendRaw's single-recipient case below; targets here are this
+        // device's own SMS contact list (not a mesh-wide broadcast), realistically single digits to low
+        // tens, so re-running CBOR+base64 encoding per number is negligible.
         val targets = if (to == null) phoneNumberFor.values.toList() else listOfNotNull(phoneNumberFor[to.nodeId])
-        if (targets.isEmpty()) return
+        targets.forEach { number -> sendRaw(number, wire) }
+    }
+
+    /**
+     * Encodes and sends [wire] directly to [phoneNumber], bypassing [phoneNumberFor] — [send]'s per-nodeId
+     * path funnels through this too. The public entry point [SmsBootstrap] needs: by definition there's no
+     * peer row (and so no [phoneNumberFor] entry) for a number it's initiating contact with, and arguably
+     * not yet for one it's accepting either (that peer is pinned, unverified, but this is exactly the send
+     * that reciprocates). Returns false only when there's no working [SmsManager] or the platform send call
+     * itself throws; there's no delivery acknowledgment either way — SMS has none in this transport, same
+     * as every other frame that isn't itself a [FrameType.RECEIPT].
+     */
+    suspend fun sendRaw(
+        phoneNumber: String,
+        wire: WireEnvelope,
+    ): Boolean {
+        val manager = smsManager ?: return false
         val text = SmsWireCodec.encode(WireCodec.encodeWire(wire))
-        targets.forEach { number ->
-            runCatching {
-                val parts = manager.divideMessage(text)
-                manager.sendMultipartTextMessage(number, null, parts, null, null)
-            }.onFailure { Log.w(TAG, "send failed", it) }
+        return runCatching {
+            val parts = manager.divideMessage(text)
+            manager.sendMultipartTextMessage(phoneNumber, null, parts, null, null)
+            true
+        }.getOrElse {
+            Log.w(TAG, "sendRaw failed", it)
+            false
         }
     }
+
+    /**
+     * Normalizes [number] to E.164 using this device's SIM country as the default region for a
+     * national-format (no leading `+`) input — the same resolution [start]'s routing-table refresh and
+     * [onSmsReceived] use internally. Exposed for [SmsBootstrap], which needs to normalize a user-typed
+     * or peer-row number before sending to it. Null if normalization fails (see [PhoneNumberNormalizer]).
+     */
+    fun normalize(number: String): String? = PhoneNumberNormalizer.normalize(number, defaultRegion())
 
     /**
      * Always false. Permanently out of scope for this transport, not deferred — see the class doc and
@@ -241,7 +270,8 @@ class SmsTransport(
      * If [type]/[payload] is a genuine first-contact [FrameType.PROFILE] — its key actually hashes to
      * [fromNodeId] (the free, cheap half of what InboundPipeline's handleProfile will separately,
      * asynchronously verify in full via signature) — and no peer row exists for [fromNodeId] yet, remembers
-     * [sender]'s normalized number so [start]'s collector can attach it the moment that row is pinned. Deliberately does nothing for an already-known [fromNodeId] (see [pendingPhoneNumberFor]'s
+     * [sender]'s normalized number so [start]'s collector can attach it the moment that row is pinned.
+     * Deliberately does nothing for an already-known [fromNodeId] (see [pendingPhoneNumberFor]'s
      * doc for why re-attaching to an existing row would be wrong) or a sender address that fails to
      * normalize (alphanumeric sender ID, malformed — can never be a real callback number anyway).
      */
