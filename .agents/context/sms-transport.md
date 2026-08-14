@@ -54,13 +54,6 @@ skips a peer with no number the same way any transport skips a peer it can't rea
 
 ## Open questions for later batches (not yet decided)
 
-- **Bootstrapping an SMS-only contact.** Today every peer relationship starts via mesh proximity + a
-  safety-number verification. Is a phone-number-only contact (never met over mesh, no `pubKey` yet)
-  supported at all, and if so, how does the *first* message — which needs to carry or negotiate a public
-  key before anything can be E2E-encrypted — fit inside an SMS payload and stay believable as
-  "attacker-resistant" rather than a trust-on-first-use downgrade from what mesh already does? Still open;
-  `SmsTransport` (batch 2) only ever surfaces peers that already have both a `phoneNumber` and a pinned
-  `pubKey`, same trust model as every other transport — an SMS-only contact simply isn't representable yet.
 - **Default SMS app.** Decided (batch 2), reverted to that decision after a batch 3 detour: **not
   claimed.** `SmsTransport` registers only a dynamic `BroadcastReceiver` for `SMS_RECEIVED_ACTION`, which
   any app holding `RECEIVE_SMS` gets regardless of default-app status. This is the smaller ask and enough
@@ -232,6 +225,54 @@ If MMS and a real "use Lattice like a normal SMS app" experience get built later
 substantial UI project — conversation list, compose screen, thread persistence — not something to back into
 via a role claim with no UI behind it. Treat it as its own deliberate feature, decided and scoped up front,
 not a batch tacked onto the mesh-transport work.
+
+## Batch 5 (in progress): SMS-only contact bootstrapping (TOFU over SMS)
+
+Resolves the "Bootstrapping an SMS-only contact" open question above. **Decided:** yes, supported, via
+trust-on-first-use over SMS — the same TOFU model mesh already uses for a proximity-discovered peer's
+`pubKey`, just carried over a different transport. Explicit-accept gate before replying (below) is what
+keeps this from being a silent downgrade from mesh's trust posture: SMS is carrier-visible and address-
+spoofable in ways proximity radio isn't, so the user gets a say before we hand a stranger our own profile.
+
+**Design:**
+- **Receiving a first-contact SMS.** `SmsTransport.onSmsReceived` no longer requires the sender to already
+  have a `phoneNumber` attached (reverses batch 2's "only peers with both a `phoneNumber` and a pinned
+  `pubKey`" restriction quoted above). It decodes any inbound frame the same way every other transport does
+  and lets `InboundPipeline.verifyInbound`/`handleProfile` decide: a genuine self-certifying
+  `FrameType.PROFILE` (its key actually hashes to the claimed nodeId) gets pinned as a brand-new, unverified
+  peer, exactly as a first-sighting over Bluetooth/Wi-Fi Aware would. Anything else from an unknown number
+  fails verification downstream and is dropped there, same as always — this transport adds no new trust,
+  it just stops gating receipt on a routing-table entry it can't have yet for a stranger.
+- **`profileSentAt`** (`PeerEntity`, `MIGRATION_2_3`, landed) — when we last sent our own profile directly
+  to this peer's number. Null means either we haven't reciprocated yet (pinned from their first-contact
+  PROFILE, unverified, can't decrypt anything from us until we do) or the row predates the field.
+- **Explicit-accept gate (not yet built).** We must never auto-reply to an unsolicited first-contact
+  PROFILE with our own — that would hand out our profile to anyone who can send an SMS claiming a
+  self-consistent keypair, no user decision involved. Sending our profile (setting `profileSentAt`) only
+  ever happens on an explicit user action: either accepting a pending inbound request, or the user manually
+  initiating contact with a phone number they already have out of band. Both are the same underlying action
+  (send-our-profile-to-this-number) gated by different UI entry points.
+- **UI entry point (not yet built).** The Contacts screen gets a "pending SMS requests" section: peers with
+  a `phoneNumber` and pinned `pubKey` but `profileSentAt == null` (someone who texted us first, unverified,
+  unreciprocated). Accepting one sends our profile to their number. A separate "message someone by phone
+  number" action covers the reverse: the user already has a number (out of band) and wants to initiate.
+- **Not yet decided:** where the profile-sending primitive lives. `SmsTransport.send(wire, to)` only
+  routes to a nodeId already in its `phoneNumberFor` table — there's no peer row yet for a number we're
+  initiating contact with, or (arguably) for one we're accepting before we've reciprocated. Needs either a
+  new `SmsTransport` method that sends to a raw phone number bypassing the per-nodeId table, or a
+  standalone class that talks to `SmsManager` directly. Building our own signed `ProfileContent` envelope
+  currently lives as `MeshManager.currentProfileEnvelope()`/`sign()` (both private) — whatever sends the
+  SMS-side profile needs the same construction (display name/status/avatarHash/pubKey/deviceTag/
+  protoVersion/capabilities, Ed25519-signed) without duplicating it, which likely means extracting that
+  into a small shared class both `MeshManager` and the new SMS-bootstrap code can use. Flagged rather than
+  guessed at, since it's a real architecture call (new shared abstraction vs. exposing `MeshManager`
+  internals vs. accepted duplication) worth deciding deliberately, not mid-implementation.
+
+Landed so far this batch: `PeerEntity.profileSentAt` + `MIGRATION_2_3` + schema v3 (identityHash is a
+placeholder — no Google Maven access in this sandbox to run the real KSP export, needs regenerating via
+a real Gradle build), `PeerDao`/`PeerRepository.setProfileSentAt`, and the `SmsTransport` receive-side
+rewrite described above. Not yet built: the profile-send primitive, the explicit-accept gate, and both UI
+entry points on the Contacts screen.
 
 ## Post-batch-3 follow-up: detekt fixes, onboarding UI, real execution verification (historical — MMS since removed)
 
