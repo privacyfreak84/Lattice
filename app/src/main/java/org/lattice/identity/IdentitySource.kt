@@ -8,7 +8,7 @@ package org.lattice.identity
  * than the real AndroidKeyStore-backed [Identity]. [Identity] implements it verbatim.
  *
  * `deviceTag()` is deliberately absent: it rides only on **outbound** profile origination
- * (`currentProfileEnvelope`), which stays in `MeshManager`.
+ * (`org.lattice.mesh.OwnProfileEnvelope.current`), not inbound verification.
  */
 interface IdentitySource {
     /** This device's node id — the self-certifying hash of its [publicKeyBundle]. */

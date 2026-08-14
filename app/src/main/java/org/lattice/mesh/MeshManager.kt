@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.lattice.TextLimits
 import org.lattice.data.AttachmentStore
 import org.lattice.data.BlobRepository
 import org.lattice.data.GroupRepository
@@ -45,8 +44,6 @@ import org.lattice.mesh.protocol.FrameType
 import org.lattice.mesh.protocol.GroupInfo
 import org.lattice.mesh.protocol.GroupLeaveContent
 import org.lattice.mesh.protocol.Mention
-import org.lattice.mesh.protocol.ProfileContent
-import org.lattice.mesh.protocol.Protocol
 import org.lattice.mesh.protocol.ReactionContent
 import org.lattice.mesh.protocol.RelayEnvelope
 import org.lattice.mesh.protocol.ReplyRef
@@ -55,7 +52,6 @@ import org.lattice.mesh.protocol.WireCodec
 import org.lattice.mesh.protocol.WireEnvelope
 import org.lattice.moderation.ImageScreeningService
 import org.lattice.moderation.ScopedTextModerator
-import org.lattice.normalizeSingleLine
 import org.lattice.notifications.Notifier
 import java.util.concurrent.ConcurrentHashMap
 
@@ -94,6 +90,10 @@ class MeshManager(
     // Per-session scope for the collectors + metrics loop + router; cancelled in stop() so they don't
     // accumulate across start/stop cycles (e.g. a Diagnostics-triggered restart()).
     private var sessionScope: CoroutineScope? = null
+
+    // Builds/signs our own profile frame — the one place that logic lives, also used by the SMS-only-
+    // contact bootstrap flow (see OwnProfileEnvelope's doc) so the two paths can't drift on its shape.
+    private val ownProfile = OwnProfileEnvelope(identity, settings, messageCrypto)
 
     // Content-addressed image fetch over the mesh, backed by the encrypted blob store.
     private val blobExchange =
@@ -729,7 +729,7 @@ class MeshManager(
      */
     private fun seedOwnProfileCustody(session: CoroutineScope) {
         session.launch {
-            val env = currentProfileEnvelope()
+            val env = ownProfile.current()
             forwardSync.onSeen(sign(env), env, ForwardStore.ORIGIN_SELF)
         }
     }
@@ -756,7 +756,7 @@ class MeshManager(
                 val now = clock()
                 if (now - lastFloodAt < PROFILE_REFLOOD_MIN_MS) return@collect
                 lastFloodAt = now
-                originateSigned(currentProfileEnvelope())
+                originateSigned(ownProfile.current())
             }
         }
     }
@@ -802,7 +802,7 @@ class MeshManager(
     }
 
     private suspend fun pushProfileTo(peer: Peer) {
-        val env = currentProfileEnvelope()
+        val env = ownProfile.current()
         val wire = sign(env)
         // Custody our own profile (ORIGIN_SELF), exactly as a peer that receives it carries it (ORIGIN_RELAY).
         // Without this our store is permanently missing our own profile while every peer holds it, so the
@@ -814,7 +814,7 @@ class MeshManager(
     }
 
     private suspend fun broadcastProfile() {
-        originateSigned(currentProfileEnvelope())
+        originateSigned(ownProfile.current())
         transport.neighbors.value.forEach { sendAvatarIfNeeded(it) }
     }
 
@@ -832,32 +832,6 @@ class MeshManager(
     }
 
     private fun avatarMeta(hash: String): FileMeta = FileMeta(FileKind.AVATAR, key = hash, mime = "image/jpeg")
-
-    private suspend fun currentProfileEnvelope(): RelayEnvelope {
-        val me = identity.nodeId()
-        // Persisted, so the profile frame's id + sentAt are stable across restarts — an unchanged profile
-        // re-broadcasts as the *same* custodied frame instead of a new one, letting the digests converge.
-        val version = settings.profileVersion.first()
-        val content =
-            ProfileContent(
-                // Normalize/cap defensively: covers legacy values stored before the field gained a cap and
-                // the rare process-death-before-the-blur-commit case, so peers never receive an oversized name.
-                name = normalizeSingleLine(settings.displayName.first()).take(TextLimits.DISPLAY_NAME),
-                status = normalizeSingleLine(settings.status.first()).take(TextLimits.STATUS),
-                avatarHash = settings.ownAvatarHash.first(),
-                pubKey = identity.publicKeyBundle(),
-                deviceTag = identity.deviceTag(),
-                protoVersion = Protocol.VERSION,
-                capabilities = Protocol.LOCAL_CAPABILITIES,
-            )
-        return RelayEnvelope(
-            type = FrameType.PROFILE,
-            id = "profile-$me-$version",
-            senderId = me,
-            sentAt = version,
-            payload = WireCodec.encodePayload(content),
-        )
-    }
 
     // --- Signed origination ---
 
