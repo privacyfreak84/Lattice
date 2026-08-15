@@ -12,6 +12,7 @@ import org.lattice.ui.group.GroupDetailsViewModel
 import org.lattice.ui.profile.ProfileDetailsViewModel
 import org.lattice.ui.profile.ProfileViewModel
 import org.lattice.ui.requests.MessageRequestsViewModel
+import org.lattice.ui.smsrequests.SmsRequestsViewModel
 import org.lattice.ui.verify.VerifyContactViewModel
 
 val uiModule =
@@ -48,5 +49,6 @@ val uiModule =
         }
         viewModel { BlockedUsersViewModel(get(), get()) }
         viewModel { MessageRequestsViewModel(get(), get(), get(), get(), get(), androidContext()) }
+        viewModel { SmsRequestsViewModel(get(), get(), get()) }
         viewModel { VerifyContactViewModel(get(), get()) }
     }
