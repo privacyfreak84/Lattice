@@ -21,6 +21,7 @@ import org.junit.Test
 import org.lattice.data.PeerRepository
 import org.lattice.data.peer.PeerEntity
 import org.lattice.data.settings.SettingsStore
+import org.lattice.mesh.sms.InitiateResult
 import org.lattice.mesh.sms.SmsBootstrap
 
 /**
@@ -113,5 +114,55 @@ class SmsRequestsViewModelTest {
             advanceUntilIdle()
 
             coVerify(exactly = 1) { settings.block("bob", "tag-1") }
+        }
+
+    @Test
+    fun `initiate maps SENT through to initiateResult`() =
+        runTest {
+            coEvery { bootstrap.initiate("+12015550123") } returns InitiateResult.SENT
+            val vm = vm()
+
+            vm.initiate("+12015550123")
+            advanceUntilIdle()
+
+            assertEquals(SmsInitiateResult.SENT, vm.initiateResult.value)
+        }
+
+    @Test
+    fun `initiate maps INVALID_NUMBER through to initiateResult, distinctly from SEND_FAILED`() =
+        runTest {
+            coEvery { bootstrap.initiate("garbage") } returns InitiateResult.INVALID_NUMBER
+            val vm = vm()
+
+            vm.initiate("garbage")
+            advanceUntilIdle()
+
+            assertEquals(SmsInitiateResult.INVALID, vm.initiateResult.value)
+        }
+
+    @Test
+    fun `initiate maps SEND_FAILED through to initiateResult`() =
+        runTest {
+            coEvery { bootstrap.initiate("+12015550123") } returns InitiateResult.SEND_FAILED
+            val vm = vm()
+
+            vm.initiate("+12015550123")
+            advanceUntilIdle()
+
+            assertEquals(SmsInitiateResult.SEND_FAILED, vm.initiateResult.value)
+        }
+
+    @Test
+    fun `consumeInitiateResult clears the one-shot result`() =
+        runTest {
+            coEvery { bootstrap.initiate(any()) } returns InitiateResult.SENT
+            val vm = vm()
+            vm.initiate("+12015550123")
+            advanceUntilIdle()
+            assertEquals(SmsInitiateResult.SENT, vm.initiateResult.value)
+
+            vm.consumeInitiateResult()
+
+            assertEquals(null, vm.initiateResult.value)
         }
 }

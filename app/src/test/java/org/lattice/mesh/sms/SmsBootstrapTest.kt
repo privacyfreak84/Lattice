@@ -4,6 +4,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,22 +43,22 @@ class SmsBootstrapTest {
     // --- initiate ---
 
     @Test
-    fun `initiate returns false and never sends for a national-format number with no country code`() =
+    fun `initiate returns INVALID_NUMBER and never sends for a national-format number with no country code`() =
         runTest {
             // No leading + and no default region applied (see initiate's doc) -- can't resolve a country.
             val (transport, _, bootstrap) = rig()
 
-            assertFalse(bootstrap.initiate("201-555-0123"))
+            assertEquals(InitiateResult.INVALID_NUMBER, bootstrap.initiate("201-555-0123"))
 
             coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
         }
 
     @Test
-    fun `initiate returns false and never sends for an alphanumeric sender ID`() =
+    fun `initiate returns INVALID_NUMBER and never sends for an alphanumeric sender ID`() =
         runTest {
             val (transport, _, bootstrap) = rig()
 
-            assertFalse(bootstrap.initiate("AIRTIME"))
+            assertEquals(InitiateResult.INVALID_NUMBER, bootstrap.initiate("AIRTIME"))
 
             coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
         }
@@ -67,17 +68,17 @@ class SmsBootstrapTest {
         runTest {
             val (transport, _, bootstrap) = rig()
 
-            assertTrue(bootstrap.initiate("+1 (201) 555-0123"))
+            assertEquals(InitiateResult.SENT, bootstrap.initiate("+1 (201) 555-0123"))
 
             coVerify(exactly = 1) { transport.sendRaw("+12015550123", wire) }
         }
 
     @Test
-    fun `initiate returns false when the underlying send fails`() =
+    fun `initiate returns SEND_FAILED, distinct from INVALID_NUMBER, when the underlying send fails`() =
         runTest {
             val (_, _, bootstrap) = rig(sendResult = false)
 
-            assertFalse(bootstrap.initiate("+12015550123"))
+            assertEquals(InitiateResult.SEND_FAILED, bootstrap.initiate("+12015550123"))
         }
 
     // --- accept ---

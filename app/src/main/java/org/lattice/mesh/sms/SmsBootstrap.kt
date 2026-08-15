@@ -4,6 +4,12 @@ import org.lattice.data.PeerRepository
 import org.lattice.mesh.OwnProfileEnvelope
 
 /**
+ * Outcome of [SmsBootstrap.initiate] — the UI needs to distinguish these, since "fix the number" and
+ * "try again later" are different asks of the user.
+ */
+enum class InitiateResult { SENT, INVALID_NUMBER, SEND_FAILED }
+
+/**
  * The send-side half of SMS-only-contact bootstrapping — see [SmsTransport]'s class doc and
  * `.agents/context/sms-transport.md` (batch 5) for the design. Sending our own profile to a stranger's
  * number only ever happens on an explicit user action funneled through here: [SmsTransport]'s receive
@@ -36,13 +42,13 @@ class SmsBootstrap(
      * case, where the local SIM region is at least a plausible guess for a carrier's `originatingAddress`)
      * — so a bare national-format number without a `+` fails to normalize rather than silently resolving
      * against the wrong country (same reasoning as [org.lattice.ui.profile.ProfileDetailsViewModel
-     * .setPhoneNumber], attaching a number to an existing peer). Returns false if normalization or the
-     * underlying send fails (no working [android.telephony.SmsManager]) — the caller should surface that
-     * as "couldn't send", not assume it went through.
+     * .setPhoneNumber], attaching a number to an existing peer).
      */
-    suspend fun initiate(phoneNumber: String): Boolean {
-        val normalized = PhoneNumberNormalizer.normalize(phoneNumber, defaultRegion = null) ?: return false
-        return sendOwnProfile(normalized)
+    suspend fun initiate(phoneNumber: String): InitiateResult {
+        val normalized =
+            PhoneNumberNormalizer.normalize(phoneNumber, defaultRegion = null)
+                ?: return InitiateResult.INVALID_NUMBER
+        return if (sendOwnProfile(normalized)) InitiateResult.SENT else InitiateResult.SEND_FAILED
     }
 
     /**
