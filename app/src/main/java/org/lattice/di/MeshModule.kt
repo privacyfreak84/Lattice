@@ -13,12 +13,14 @@ import org.lattice.mesh.MeshController
 import org.lattice.mesh.MeshManager
 import org.lattice.mesh.MeshMetrics
 import org.lattice.mesh.MeshTransport
+import org.lattice.mesh.OwnProfileEnvelope
 import org.lattice.mesh.StoreDigest
 import org.lattice.mesh.bluetooth.BluetoothMeshTransport
 import org.lattice.mesh.crypto.MessageCrypto
 import org.lattice.mesh.meshExceptionHandler
 import org.lattice.mesh.power.PowerMonitor
 import org.lattice.mesh.power.PowerStateSource
+import org.lattice.mesh.sms.SmsBootstrap
 import org.lattice.mesh.sms.SmsTransport
 import org.lattice.mesh.wifiaware.WifiAwareTransport
 import java.io.File
@@ -48,6 +50,13 @@ val meshModule =
         // .agents/context/sms-transport.md batch 4: batch 3's default-SMS-app claim was reverted, so this
         // is back to an inline child like the radio transports — no manifest receiver needs to reach a
         // shared instance via DI anymore, since inbound routing is this transport's own dynamic receiver.
+        // Its own gettable single (not just a CompositeMeshTransport child) since batch 5's SmsBootstrap
+        // needs the concrete SmsTransport for sendRaw()/normalize() -- neither is on the general
+        // MeshTransport interface the composite exposes. Safe to construct unconditionally: SmsManager/
+        // TelephonyManager lookups inside its constructor already tolerate no telephony hardware (see its
+        // constructor comments), self-degrading to Unavailable rather than throwing -- isSupported() below
+        // still gates whether it's *added* to the composite as an active routing child.
+        single { SmsTransport(androidContext(), get(), get()) }
         single<MeshTransport> {
             demoTransportOrNull() ?: run {
                 val ctx = androidContext()
@@ -68,7 +77,7 @@ val meshModule =
                         // self-degrades to Unavailable at runtime if SEND_SMS/RECEIVE_SMS aren't granted or there's
                         // no SIM, same pattern as the radio transports self-degrading on a missing permission.
                         if (SmsTransport.isSupported(ctx)) {
-                            add(SmsTransport(ctx, get(), get()))
+                            add(get<SmsTransport>())
                         }
                     }
                 CompositeMeshTransport(children, get(), get()) { msg ->
@@ -81,6 +90,16 @@ val meshModule =
             val keys = get<IdentityKeyStore>().keys()
             MessageCrypto(keys.hybridPrivate, keys.sigPrivate)
         }
+        // Own-profile construction+signing, shared by MeshManager's mesh broadcast and SmsBootstrap's
+        // point-to-point send — see OwnProfileEnvelope's doc. MeshManager builds its own private instance
+        // from the same (identity, settings, messageCrypto) singletons rather than taking this one as a
+        // constructor param (see the batch 5 commit that extracted this class) -- both instances are
+        // stateless and read the same underlying Flow sources, so this is a deliberate, harmless small
+        // duplication rather than a MeshManager constructor/DI-graph change for its own sake.
+        single { OwnProfileEnvelope(get(), get(), get()) }
+        // The send-side of SMS-only-contact bootstrapping -- see SmsBootstrap's class doc and
+        // .agents/context/sms-transport.md batch 5.
+        single { SmsBootstrap(get(), get(), get()) }
         // Constructor order: transport, messages, groups, reactions, peers, identity, settings, blobs,
         // imageScreening, blobStore, forwardStore, notifier, textModeration, messageCrypto, scope, metrics, db.
         single {
