@@ -73,4 +73,14 @@ interface PeerDao {
      */
     @Query("SELECT * FROM peers WHERE phoneNumber IS NOT NULL")
     fun observeWithPhoneNumber(): Flow<List<PeerEntity>>
+
+    /**
+     * Pending SMS-only-contact requests: peers with both a [PeerEntity.phoneNumber] and a pinned
+     * [PeerEntity.pubKey] but [PeerEntity.profileSentAt] still null — someone who texted us first (see
+     * [org.lattice.mesh.sms.SmsTransport]'s class doc), pinned unverified, that we haven't reciprocated to
+     * yet. See [org.lattice.mesh.sms.SmsBootstrap.accept] for the action that clears this by sending our
+     * profile and setting profileSentAt.
+     */
+    @Query("SELECT * FROM peers WHERE phoneNumber IS NOT NULL AND pubKey IS NOT NULL AND profileSentAt IS NULL")
+    fun observePendingSmsRequests(): Flow<List<PeerEntity>>
 }

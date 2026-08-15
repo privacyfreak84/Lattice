@@ -74,6 +74,31 @@ class PeerDaoTest : RoomDbTest() {
         }
 
     @Test
+    fun `observeWithPhoneNumber emits only peers that have one attached`() =
+        runTest {
+            dao.upsert(PeerEntity(nodeId = "a", phoneNumber = "+15551234567"))
+            dao.upsert(PeerEntity(nodeId = "b", phoneNumber = null))
+            assertEquals(listOf("a"), dao.observeWithPhoneNumber().first().map { it.nodeId })
+        }
+
+    @Test
+    fun `observePendingSmsRequests emits only peers with a phoneNumber and pubKey but no profileSentAt`() =
+        runTest {
+            // Pending: phoneNumber + pubKey, haven't reciprocated yet -- the one row that should show.
+            dao.upsert(PeerEntity(nodeId = "pending", phoneNumber = "+15551234567", pubKey = "KEY"))
+            // Already reciprocated: same shape but profileSentAt set -- no longer pending.
+            dao.upsert(
+                PeerEntity(nodeId = "sent", phoneNumber = "+15559876543", pubKey = "KEY", profileSentAt = 1L),
+            )
+            // No pubKey yet (shouldn't be reachable via SmsTransport's own pinning, but guards the query).
+            dao.upsert(PeerEntity(nodeId = "no-key", phoneNumber = "+15551112222", pubKey = null))
+            // Mesh-only, no phoneNumber at all.
+            dao.upsert(PeerEntity(nodeId = "mesh-only", phoneNumber = null, pubKey = "KEY"))
+
+            assertEquals(listOf("pending"), dao.observePendingSmsRequests().first().map { it.nodeId })
+        }
+
+    @Test
     fun `countByAvatarHash counts peers referencing that avatar blob`() =
         runTest {
             dao.upsert(PeerEntity(nodeId = "a", avatarHash = "h1"))
