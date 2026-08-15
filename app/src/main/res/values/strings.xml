@@ -151,6 +151,9 @@
     <string name="message_requests_block">Block</string>
     <string name="message_requests_block_confirm_title">Block this person?</string>
     <string name="message_requests_block_confirm_body">You won\'t receive messages from them, and this request is removed.</string>
+    <string name="sms_requests_title">SMS requests</string>
+    <string name="sms_requests_menu_item_with_count">SMS requests (%d)</string>
+    <string name="sms_requests_empty">No pending SMS requests</string>
     <string name="message_requests_delete_confirm_title">Delete request?</string>
     <string name="message_requests_delete_confirm_body">This conversation will be removed from this device only.</string>
 
