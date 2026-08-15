@@ -2,7 +2,6 @@ package org.lattice.mesh.sms
 
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
@@ -17,21 +16,21 @@ import org.lattice.mesh.protocol.WireEnvelope
 
 /**
  * [SmsBootstrap] never touches the network/SIM itself — [transport]/[peers]/[ownProfile] are mocked, so
- * this pins the *control flow* (when we send, when we normalize, when/whether we record
- * [PeerRepository.setProfileSentAt]), not the wire format (covered by [org.lattice.mesh.OwnProfileEnvelopeTest]
- * and [SmsWireCodecTest]) or [SmsTransport]'s own send/receive plumbing (untested at this level — see its
- * class doc and the design notes' explanation of why radio-backed transports in this codebase aren't
- * unit-tested).
+ * this pins the *control flow* (when we send, when/whether we record [PeerRepository.setProfileSentAt]),
+ * not the wire format (covered by [org.lattice.mesh.OwnProfileEnvelopeTest] and `SmsWireCodecTest`) or
+ * [SmsTransport]'s own send/receive plumbing (untested at this level — see its class doc and the design
+ * notes' explanation of why radio-backed transports in this codebase aren't unit-tested).
+ *
+ * [initiate]'s normalization itself goes through the real [PhoneNumberNormalizer] (not mocked) with
+ * `defaultRegion = null` — see [SmsBootstrap.initiate]'s doc for why no default region is applied here,
+ * unlike [SmsTransport]'s own inbound-parsing case. `+12015550123` is libphonenumber's own documented
+ * example number (see [PhoneNumberNormalizerTest]), reused here rather than a hand-picked one.
  */
 class SmsBootstrapTest {
     private val wire = WireEnvelope(sig = ByteArray(0), signed = ByteArray(0))
 
-    private fun rig(
-        normalized: String? = "+15551234567",
-        sendResult: Boolean = true,
-    ): Triple<SmsTransport, PeerRepository, SmsBootstrap> {
+    private fun rig(sendResult: Boolean = true): Triple<SmsTransport, PeerRepository, SmsBootstrap> {
         val transport = mockk<SmsTransport>()
-        every { transport.normalize(any()) } returns normalized
         coEvery { transport.sendRaw(any(), any()) } returns sendResult
         val peers = mockk<PeerRepository>()
         coEvery { peers.setProfileSentAt(any(), any()) } returns Unit
@@ -43,23 +42,34 @@ class SmsBootstrapTest {
     // --- initiate ---
 
     @Test
-    fun `initiate returns false and never sends when the number fails to normalize`() =
+    fun `initiate returns false and never sends for a national-format number with no country code`() =
         runTest {
-            val (transport, _, bootstrap) = rig(normalized = null)
+            // No leading + and no default region applied (see initiate's doc) -- can't resolve a country.
+            val (transport, _, bootstrap) = rig()
 
-            assertFalse(bootstrap.initiate("not a number"))
+            assertFalse(bootstrap.initiate("201-555-0123"))
 
             coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
         }
 
     @Test
-    fun `initiate normalizes the number and sends our signed profile to it`() =
+    fun `initiate returns false and never sends for an alphanumeric sender ID`() =
         runTest {
-            val (transport, _, bootstrap) = rig(normalized = "+15551234567")
+            val (transport, _, bootstrap) = rig()
 
-            assertTrue(bootstrap.initiate("(555) 123-4567"))
+            assertFalse(bootstrap.initiate("AIRTIME"))
 
-            coVerify(exactly = 1) { transport.sendRaw("+15551234567", wire) }
+            coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
+        }
+
+    @Test
+    fun `initiate normalizes an already-international number and sends our signed profile to it`() =
+        runTest {
+            val (transport, _, bootstrap) = rig()
+
+            assertTrue(bootstrap.initiate("+1 (201) 555-0123"))
+
+            coVerify(exactly = 1) { transport.sendRaw("+12015550123", wire) }
         }
 
     @Test
@@ -67,7 +77,7 @@ class SmsBootstrapTest {
         runTest {
             val (_, _, bootstrap) = rig(sendResult = false)
 
-            assertFalse(bootstrap.initiate("+15551234567"))
+            assertFalse(bootstrap.initiate("+12015550123"))
         }
 
     // --- accept ---

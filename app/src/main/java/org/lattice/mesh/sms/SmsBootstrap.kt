@@ -30,13 +30,18 @@ class SmsBootstrap(
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     /**
-     * Sends our profile to [phoneNumber] (any format [SmsTransport.normalize] can resolve against this
-     * device's SIM region) to begin an SMS-only contact. Returns false if the number fails to normalize
-     * or the underlying send fails (no working [android.telephony.SmsManager]) — the caller should surface
-     * that as "couldn't send", not assume it went through.
+     * Sends our profile to [phoneNumber] to begin an SMS-only contact. No default region is applied when
+     * resolving [phoneNumber] to E.164 — this is a specific *other* person's number, possibly in a
+     * different country than this device's own SIM (unlike [SmsTransport.onSmsReceived]'s inbound-parsing
+     * case, where the local SIM region is at least a plausible guess for a carrier's `originatingAddress`)
+     * — so a bare national-format number without a `+` fails to normalize rather than silently resolving
+     * against the wrong country (same reasoning as [org.lattice.ui.profile.ProfileDetailsViewModel
+     * .setPhoneNumber], attaching a number to an existing peer). Returns false if normalization or the
+     * underlying send fails (no working [android.telephony.SmsManager]) — the caller should surface that
+     * as "couldn't send", not assume it went through.
      */
     suspend fun initiate(phoneNumber: String): Boolean {
-        val normalized = transport.normalize(phoneNumber) ?: return false
+        val normalized = PhoneNumberNormalizer.normalize(phoneNumber, defaultRegion = null) ?: return false
         return sendOwnProfile(normalized)
     }
 

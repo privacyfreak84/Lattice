@@ -226,14 +226,6 @@ class SmsTransport(
     }
 
     /**
-     * Normalizes [number] to E.164 using this device's SIM country as the default region for a
-     * national-format (no leading `+`) input — the same resolution [start]'s routing-table refresh and
-     * [onSmsReceived] use internally. Exposed for [SmsBootstrap], which needs to normalize a user-typed
-     * or peer-row number before sending to it. Null if normalization fails (see [PhoneNumberNormalizer]).
-     */
-    fun normalize(number: String): String? = PhoneNumberNormalizer.normalize(number, defaultRegion())
-
-    /**
      * Always false. Permanently out of scope for this transport, not deferred — see the class doc and
      * design notes for why (MMS needs the default-SMS-app role, reverted in batch 4 for UX reasons; SMS
      * itself can't carry a real file; chunking over concatenated SMS was considered and rejected).
