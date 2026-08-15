@@ -15,16 +15,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +51,9 @@ import org.lattice.ui.preview.KnitPreview
 /**
  * The SMS Requests inbox — see [SmsRequestsViewModel]'s class doc. Reached from the chat list's overflow
  * menu (not a badge like Message Requests: this is a less frequent, opt-into-SMS-fallback feature, not
- * something every user is expected to have pending regularly).
+ * something every user is expected to have pending regularly). The FAB is the cold-start entry point —
+ * [SmsRequestsViewModel.initiate] — for a number the user already has out of band, separate from the
+ * per-row Accept action for someone who texted *us* first.
  */
 @Composable
 fun SmsRequestsScreen(
@@ -53,11 +61,29 @@ fun SmsRequestsScreen(
     viewModel: SmsRequestsViewModel = koinViewModel(),
 ) {
     val requests by viewModel.requests.collectAsStateWithLifecycle()
+    val initiateResult by viewModel.initiateResult.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val sentMessage = stringResource(R.string.sms_requests_sent)
+    val invalidMessage = stringResource(R.string.sms_requests_invalid_number)
+    val sendFailedMessage = stringResource(R.string.sms_requests_send_failed)
+    LaunchedEffect(initiateResult) {
+        when (initiateResult) {
+            SmsInitiateResult.SENT -> snackbarHostState.showSnackbar(sentMessage)
+            SmsInitiateResult.INVALID -> snackbarHostState.showSnackbar(invalidMessage)
+            SmsInitiateResult.SEND_FAILED -> snackbarHostState.showSnackbar(sendFailedMessage)
+            null -> Unit
+        }
+        if (initiateResult != null) viewModel.consumeInitiateResult()
+    }
+
     SmsRequestsScreenContent(
         requests = requests,
         onAccept = viewModel::accept,
         onBlock = viewModel::block,
+        onInitiate = viewModel::initiate,
         onBack = onBack,
+        snackbarHostState = snackbarHostState,
     )
 }
 
@@ -67,8 +93,12 @@ internal fun SmsRequestsScreenContent(
     requests: List<SmsRequestRow>,
     onAccept: (nodeId: String) -> Unit,
     onBlock: (nodeId: String) -> Unit,
+    onInitiate: (phoneNumber: String) -> Unit,
     onBack: () -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    var showAddDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -82,6 +112,15 @@ internal fun SmsRequestsScreenContent(
                 },
                 title = { Text(stringResource(R.string.sms_requests_title)) },
             )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier.testTag("sms_requests_add_fab"),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.sms_requests_add_title))
+            }
         },
     ) { padding ->
         if (requests.isEmpty()) {
@@ -110,6 +149,60 @@ internal fun SmsRequestsScreenContent(
             }
         }
     }
+
+    if (showAddDialog) {
+        AddSmsContactDialog(
+            onDismiss = { showAddDialog = false },
+            onSend = { number ->
+                onInitiate(number)
+                showAddDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun AddSmsContactDialog(
+    onDismiss: () -> Unit,
+    onSend: (phoneNumber: String) -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sms_requests_add_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.sms_requests_add_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth().testTag("sms_requests_add_field"),
+                    label = { Text(stringResource(R.string.sms_requests_add_label)) },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSend(draft) },
+                modifier = Modifier.testTag("sms_requests_add_send"),
+                enabled = draft.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.sms_requests_add_send))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -198,6 +291,7 @@ fun SmsRequestsScreenContentPreview() =
                 ),
             onAccept = {},
             onBlock = {},
+            onInitiate = {},
             onBack = {},
         )
     }
@@ -206,5 +300,5 @@ fun SmsRequestsScreenContentPreview() =
 @Composable
 fun SmsRequestsScreenContentEmptyPreview() =
     KnitPreview {
-        SmsRequestsScreenContent(requests = emptyList(), onAccept = {}, onBlock = {}, onBack = {})
+        SmsRequestsScreenContent(requests = emptyList(), onAccept = {}, onBlock = {}, onInitiate = {}, onBack = {})
     }
