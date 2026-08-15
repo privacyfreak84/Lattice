@@ -41,6 +41,7 @@ import org.lattice.ui.review.RateReviewDialog
 import org.lattice.ui.review.ReviewPromptInbox
 import org.lattice.ui.share.ShareInbox
 import org.lattice.ui.share.ShareTargetScreen
+import org.lattice.ui.smsrequests.SmsRequestsScreen
 import org.lattice.ui.verify.VerifyContactScreen
 
 private object Routes {
@@ -51,6 +52,7 @@ private object Routes {
     const val DIAGNOSTICS = "diagnostics"
     const val BLOCKED_USERS = "blocked"
     const val MESSAGE_REQUESTS = "requests"
+    const val SMS_REQUESTS = "smsRequests"
     const val DONATE = "donate"
     const val VERIFY = "verify"
     const val SHARE = "share"
@@ -173,6 +175,7 @@ fun KnitApp(startRoute: String? = null) {
                 onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
                 onOpenBlockedUsers = { navController.navigate(Routes.BLOCKED_USERS) },
                 onOpenMessageRequests = { navController.navigate(Routes.MESSAGE_REQUESTS) },
+                onOpenSmsRequests = { navController.navigate(Routes.SMS_REQUESTS) },
                 onOpenDonate = { navController.navigate(Routes.DONATE) },
                 onOpenVerify = { navController.navigate(Routes.VERIFY) },
             )
@@ -278,6 +281,9 @@ fun KnitApp(startRoute: String? = null) {
                 // request and opens the DM (see ProfileDetailsScreen.onMessage).
                 onOpenProfile = { navController.navigate(Routes.profileDetails(it)) },
             )
+        }
+        composable(Routes.SMS_REQUESTS) {
+            SmsRequestsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.DONATE) {
             DonateScreen(

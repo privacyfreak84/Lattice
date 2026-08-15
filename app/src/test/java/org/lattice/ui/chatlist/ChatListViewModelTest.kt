@@ -56,6 +56,7 @@ class ChatListViewModelTest {
     private val peersFlow = MutableStateFlow(emptyList<PeerEntity>())
     private val lastReadFlow = MutableStateFlow(emptyMap<String, Long>())
     private val acceptedFlow = MutableStateFlow(emptySet<String>())
+    private val pendingSmsFlow = MutableStateFlow(emptyList<PeerEntity>())
 
     @Before
     fun setUp() {
@@ -65,6 +66,7 @@ class ChatListViewModelTest {
         every { settings.blockedNodeIds } returns blockedFlow
         every { groups.observeGroups() } returns groupsFlow
         every { peers.observePeers() } returns peersFlow
+        every { peers.observePendingSmsRequests() } returns pendingSmsFlow
         every { settings.lastReadAll } returns lastReadFlow
         every { settings.acceptedConversations } returns acceptedFlow
     }

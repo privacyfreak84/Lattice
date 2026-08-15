@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -111,6 +112,7 @@ fun ChatListScreen(
     onOpenDiagnostics: () -> Unit,
     onOpenBlockedUsers: () -> Unit,
     onOpenMessageRequests: () -> Unit,
+    onOpenSmsRequests: () -> Unit,
     onOpenDonate: () -> Unit,
     onOpenVerify: () -> Unit,
     viewModel: ChatListViewModel = koinViewModel(),
@@ -135,6 +137,7 @@ fun ChatListScreen(
         onOpenDiagnostics = onOpenDiagnostics,
         onOpenBlockedUsers = onOpenBlockedUsers,
         onOpenMessageRequests = onOpenMessageRequests,
+        onOpenSmsRequests = onOpenSmsRequests,
         onOpenDonate = onOpenDonate,
         onOpenVerify = onOpenVerify,
         onShareApp = { showShareApp = true },
@@ -198,6 +201,7 @@ internal fun ChatListScreenContent(
     onOpenDiagnostics: () -> Unit,
     onOpenBlockedUsers: () -> Unit,
     onOpenMessageRequests: () -> Unit,
+    onOpenSmsRequests: () -> Unit,
     onOpenDonate: () -> Unit,
     onOpenVerify: () -> Unit,
     onShareApp: () -> Unit,
@@ -279,6 +283,23 @@ internal fun ChatListScreenContent(
                                 onClick = {
                                     menuOpen = false
                                     onOpenBlockedUsers()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (state.smsRequestCount > 0) {
+                                            stringResource(R.string.sms_requests_menu_item_with_count, state.smsRequestCount)
+                                        } else {
+                                            stringResource(R.string.sms_requests_title)
+                                        },
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Sms, contentDescription = null) },
+                                modifier = Modifier.testTag("chatlist_sms_requests"),
+                                onClick = {
+                                    menuOpen = false
+                                    onOpenSmsRequests()
                                 },
                             )
                             DropdownMenuItem(
@@ -762,6 +783,7 @@ fun ChatListScreenPopulatedPreview() =
             onOpenDiagnostics = {},
             onOpenBlockedUsers = {},
             onOpenMessageRequests = {},
+            onOpenSmsRequests = {},
             onOpenDonate = {},
             onOpenVerify = {},
             onShareApp = {},
@@ -790,6 +812,7 @@ fun ChatListScreenRadioWarningPreview() =
             onOpenDiagnostics = {},
             onOpenBlockedUsers = {},
             onOpenMessageRequests = {},
+            onOpenSmsRequests = {},
             onOpenDonate = {},
             onOpenVerify = {},
             onShareApp = {},
@@ -813,6 +836,7 @@ fun ChatListScreenLoadingPreview() =
             onOpenDiagnostics = {},
             onOpenBlockedUsers = {},
             onOpenMessageRequests = {},
+            onOpenSmsRequests = {},
             onOpenDonate = {},
             onOpenVerify = {},
             onShareApp = {},
@@ -842,6 +866,7 @@ fun ChatListScreenQuietPreview() =
             onOpenDiagnostics = {},
             onOpenBlockedUsers = {},
             onOpenMessageRequests = {},
+            onOpenSmsRequests = {},
             onOpenDonate = {},
             onOpenVerify = {},
             onShareApp = {},

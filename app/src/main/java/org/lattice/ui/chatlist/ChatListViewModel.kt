@@ -49,6 +49,9 @@ data class ChatListUiState(
     val conversations: List<ConversationRow> = emptyList(),
     // Number of pending message-request threads (stranger DM/group not yet accepted), for the top-bar badge.
     val requestCount: Int = 0,
+    // Number of pending SMS-only-contact requests (see SmsRequestsViewModel) -- a separate inbox, since a
+    // first-contact SMS PROFILE isn't a message thread and wouldn't count toward requestCount above.
+    val smsRequestCount: Int = 0,
     val neighborCount: Int = 0,
     // Radio health, so the connection header can distinguish "nobody nearby" from radios off/seized.
     val transportHealth: TransportHealth = TransportHealth.Healthy,
@@ -88,6 +91,7 @@ class ChatListViewModel(
         val blocked: Set<String>,
         val groups: List<GroupEntity>,
         val accepted: Set<String>,
+        val smsRequestCount: Int,
     )
 
     // Neighbor count + radio health + the (already-dismissal-aware) banner, folded into one source.
@@ -103,8 +107,16 @@ class ChatListViewModel(
             settings.blockedNodeIds,
             groups.observeGroups(),
             settings.acceptedConversations,
-        ) { msgs, blocked, groupList, accepted ->
-            ListBundle(msgs.filter { it.senderId !in blocked }, blocked, groupList, accepted)
+            // Folded in here (rather than as a 6th slot on the main combine below, which is already at
+            // its typed overload's 5-flow arity) purely for badge count -- SmsRequestsScreen (not this
+            // one) does the actual blocked-filtering + row mapping for the inbox itself.
+            peers.observePendingSmsRequests(),
+        ) { msgs, blocked, groupList, accepted, pendingSms ->
+            // Same blocked-filter SmsRequestsViewModel applies to the inbox itself -- block() never
+            // touches the peers row, so without this the badge would overcount by the just-blocked ones
+            // (badge says N, but the inbox only ever shows N minus however many are blocked).
+            val pendingSmsCount = pendingSms.count { it.nodeId !in blocked }
+            ListBundle(msgs.filter { it.senderId !in blocked }, blocked, groupList, accepted, pendingSmsCount)
         }
 
     // Radio-off banner: which warning the per-radio statuses imply, and whether the user has dismissed it.
@@ -254,6 +266,7 @@ class ChatListViewModel(
             ChatListUiState(
                 conversations = (listOf(nearby) + groupRows + dms).sortedByDescending { it.lastMessageAt ?: 0L },
                 requestCount = requestCount,
+                smsRequestCount = bundle.smsRequestCount,
                 neighborCount = neighborCount,
                 transportHealth = health,
                 radioWarning = warning,
