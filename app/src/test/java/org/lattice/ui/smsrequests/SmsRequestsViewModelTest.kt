@@ -93,7 +93,8 @@ class SmsRequestsViewModelTest {
             pendingFlow.value = listOf(peer("bob", name = ""))
             advanceUntilIdle()
 
-            assertTrue(vm.requests.value.single().title.isNotBlank())
+            val title = vm.requests.value.single().title
+            assertTrue(title.isNotBlank())
         }
 
     @Test

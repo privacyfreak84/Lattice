@@ -296,7 +296,7 @@ internal fun ChatListScreenContent(
                                     )
                                 },
                                 leadingIcon = { Icon(Icons.Filled.Sms, contentDescription = null) },
-                                modifier = Modifier.testTag("chatlist_sms_requests"),
+                                modifier = Modifier.semantics { testTag = "chatlist_sms_requests" },
                                 onClick = {
                                     menuOpen = false
                                     onOpenSmsRequests()
