@@ -62,11 +62,13 @@ fun SmsRequestsScreen(
 ) {
     val requests by viewModel.requests.collectAsStateWithLifecycle()
     val initiateResult by viewModel.initiateResult.collectAsStateWithLifecycle()
+    val acceptResult by viewModel.acceptResult.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val sentMessage = stringResource(R.string.sms_requests_sent)
     val invalidMessage = stringResource(R.string.sms_requests_invalid_number)
     val sendFailedMessage = stringResource(R.string.sms_requests_send_failed)
+    val acceptNotFoundMessage = stringResource(R.string.sms_requests_accept_not_found)
     LaunchedEffect(initiateResult) {
         when (initiateResult) {
             SmsInitiateResult.SENT -> snackbarHostState.showSnackbar(sentMessage)
@@ -75,6 +77,14 @@ fun SmsRequestsScreen(
             null -> Unit
         }
         if (initiateResult != null) viewModel.consumeInitiateResult()
+    }
+    LaunchedEffect(acceptResult) {
+        when (acceptResult) {
+            SmsAcceptResult.NOT_FOUND -> snackbarHostState.showSnackbar(acceptNotFoundMessage)
+            SmsAcceptResult.SEND_FAILED -> snackbarHostState.showSnackbar(sendFailedMessage)
+            null -> Unit
+        }
+        if (acceptResult != null) viewModel.consumeAcceptResult()
     }
 
     SmsRequestsScreenContent(

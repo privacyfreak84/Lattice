@@ -161,6 +161,7 @@
     <string name="sms_requests_sent">Your profile was sent — you\'ll see them here once they reply</string>
     <string name="sms_requests_invalid_number">Enter a number with a country code, e.g. +1 555 123 4567</string>
     <string name="sms_requests_send_failed">Couldn\'t send — check your SMS permissions and try again</string>
+    <string name="sms_requests_accept_not_found">This request is no longer available</string>
     <string name="message_requests_delete_confirm_title">Delete request?</string>
     <string name="message_requests_delete_confirm_body">This conversation will be removed from this device only.</string>
 

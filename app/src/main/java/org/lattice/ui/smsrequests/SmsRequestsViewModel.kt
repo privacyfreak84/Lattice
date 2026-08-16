@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.lattice.data.PeerRepository
 import org.lattice.data.settings.SettingsStore
 import org.lattice.identity.displayNameFor
+import org.lattice.mesh.sms.AcceptResult
 import org.lattice.mesh.sms.InitiateResult
 import org.lattice.mesh.sms.SmsBootstrap
 
@@ -29,6 +30,11 @@ data class SmsRequestRow(
  * `PhoneNumberEditResult` sitting in the UI layer rather than reusing a mesh-layer type verbatim. */
 enum class SmsInitiateResult { SENT, INVALID, SEND_FAILED }
 
+/** Outcome of [SmsRequestsViewModel.accept] worth telling the user about — no ACCEPTED case: on success
+ * the row simply disappears from [SmsRequestsViewModel.requests], which is feedback enough on its own,
+ * unlike [initiate] where nothing else visibly changes when the dialog closes. */
+enum class SmsAcceptResult { NOT_FOUND, SEND_FAILED }
+
 /**
  * The SMS Requests inbox: peers who texted us first over the SMS-only-contact bootstrap flow (see
  * [org.lattice.mesh.sms.SmsTransport]'s class doc and `.agents/context/sms-transport.md` batch 5),
@@ -36,10 +42,11 @@ enum class SmsInitiateResult { SENT, INVALID, SEND_FAILED }
  * [org.lattice.ui.requests.MessageRequestsViewModel]'s DM/group inbox: a first-contact `PROFILE` frame
  * isn't a message thread, so it wouldn't appear there.
  *
- * Per row: **Accept** ([SmsBootstrap.accept] — sends our profile to their number, clears the request) or
- * **Block** (mirrors [org.lattice.ui.requests.MessageRequestsViewModel.block] — no delete/decline-only
- * option, since there's no thread here to clear; blocking is the only way to make an unwanted request
- * stop reappearing, and matches every other "decline a stranger" action in this app).
+ * Per row: **Accept** ([SmsBootstrap.accept] — sends our profile to their number, clears the request on
+ * success, surfaces a failure via [acceptResult]) or **Block** (mirrors
+ * [org.lattice.ui.requests.MessageRequestsViewModel.block] — no delete/decline-only option, since there's
+ * no thread here to clear; blocking is the only way to make an unwanted request stop reappearing, and
+ * matches every other "decline a stranger" action in this app).
  *
  * Also the cold-start entry point: [initiate] begins contact with a phone number the user already has out
  * of band (see [SmsBootstrap.initiate]'s doc for why no default region is guessed for it).
@@ -75,9 +82,22 @@ class SmsRequestsViewModel(
     private val _initiateResult = MutableStateFlow<SmsInitiateResult?>(null)
     val initiateResult: StateFlow<SmsInitiateResult?> = _initiateResult.asStateFlow()
 
-    /** Accepts [nodeId]'s request: sends our profile to their number, clearing it from [requests]. */
+    private val _acceptResult = MutableStateFlow<SmsAcceptResult?>(null)
+    val acceptResult: StateFlow<SmsAcceptResult?> = _acceptResult.asStateFlow()
+
+    /**
+     * Accepts [nodeId]'s request: sends our profile to their number, clearing it from [requests] on
+     * success. Reports a failure (only) via [acceptResult] — see [SmsAcceptResult]'s doc for why success
+     * needs no separate signal.
+     */
     fun accept(nodeId: String) {
-        viewModelScope.launch { bootstrap.accept(nodeId) }
+        viewModelScope.launch {
+            when (bootstrap.accept(nodeId)) {
+                AcceptResult.ACCEPTED -> Unit
+                AcceptResult.NOT_FOUND -> _acceptResult.value = SmsAcceptResult.NOT_FOUND
+                AcceptResult.SEND_FAILED -> _acceptResult.value = SmsAcceptResult.SEND_FAILED
+            }
+        }
     }
 
     /** Declines by blocking — see the class doc for why there's no separate delete-only option here. */
@@ -103,5 +123,9 @@ class SmsRequestsViewModel(
 
     fun consumeInitiateResult() {
         _initiateResult.value = null
+    }
+
+    fun consumeAcceptResult() {
+        _acceptResult.value = null
     }
 }

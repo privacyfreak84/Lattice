@@ -5,7 +5,6 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.lattice.data.PeerRepository
@@ -84,24 +83,24 @@ class SmsBootstrapTest {
     // --- accept ---
 
     @Test
-    fun `accept returns false and sends nothing for a nodeId with no peer row`() =
+    fun `accept returns NOT_FOUND and sends nothing for a nodeId with no peer row`() =
         runTest {
             val (transport, peers, bootstrap) = rig()
             coEvery { peers.find("stranger") } returns null
 
-            assertFalse(bootstrap.accept("stranger"))
+            assertEquals(AcceptResult.NOT_FOUND, bootstrap.accept("stranger"))
 
             coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
             coVerify(exactly = 0) { peers.setProfileSentAt(any(), any()) }
         }
 
     @Test
-    fun `accept returns false for a peer with no phoneNumber attached`() =
+    fun `accept returns NOT_FOUND for a peer with no phoneNumber attached`() =
         runTest {
             val (transport, peers, bootstrap) = rig()
             coEvery { peers.find("mesh-only") } returns PeerEntity(nodeId = "mesh-only", phoneNumber = null)
 
-            assertFalse(bootstrap.accept("mesh-only"))
+            assertEquals(AcceptResult.NOT_FOUND, bootstrap.accept("mesh-only"))
 
             coVerify(exactly = 0) { transport.sendRaw(any(), any()) }
         }
@@ -112,19 +111,19 @@ class SmsBootstrapTest {
             val (transport, peers, bootstrap) = rig()
             coEvery { peers.find("bob") } returns PeerEntity(nodeId = "bob", phoneNumber = "+15559876543")
 
-            assertTrue(bootstrap.accept("bob"))
+            assertEquals(AcceptResult.ACCEPTED, bootstrap.accept("bob"))
 
             coVerify(exactly = 1) { transport.sendRaw("+15559876543", wire) }
             coVerify(exactly = 1) { peers.setProfileSentAt("bob", 1_700_000_000_000L) }
         }
 
     @Test
-    fun `accept does not record profileSentAt when the send fails`() =
+    fun `accept returns SEND_FAILED, distinct from NOT_FOUND, and does not record profileSentAt`() =
         runTest {
             val (_, peers, bootstrap) = rig(sendResult = false)
             coEvery { peers.find("bob") } returns PeerEntity(nodeId = "bob", phoneNumber = "+15559876543")
 
-            assertFalse(bootstrap.accept("bob"))
+            assertEquals(AcceptResult.SEND_FAILED, bootstrap.accept("bob"))
 
             coVerify(exactly = 0) { peers.setProfileSentAt(any(), any()) }
         }

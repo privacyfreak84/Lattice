@@ -10,6 +10,14 @@ import org.lattice.mesh.OwnProfileEnvelope
 enum class InitiateResult { SENT, INVALID_NUMBER, SEND_FAILED }
 
 /**
+ * Outcome of [SmsBootstrap.accept]. NOT_FOUND shouldn't happen for a real SMS-pinned peer (see
+ * [SmsBootstrap]'s class doc) but is kept distinct from SEND_FAILED rather than collapsed into it — a
+ * caller passing a stale/mesh-only nodeId (e.g. the row vanished between the UI reading it and the user
+ * tapping Accept) deserves "nothing to accept" rather than "try again," which would just repeat the no-op.
+ */
+enum class AcceptResult { ACCEPTED, NOT_FOUND, SEND_FAILED }
+
+/**
  * The send-side half of SMS-only-contact bootstrapping — see [SmsTransport]'s class doc and
  * `.agents/context/sms-transport.md` (batch 5) for the design. Sending our own profile to a stranger's
  * number only ever happens on an explicit user action funneled through here: [SmsTransport]'s receive
@@ -53,17 +61,15 @@ class SmsBootstrap(
 
     /**
      * Accepts a pending inbound first-contact request from [nodeId]: sends our profile to their attached
-     * number and records [PeerRepository.setProfileSentAt] on success. Returns false — a no-op, nothing
+     * number and records [PeerRepository.setProfileSentAt] on success. NOT_FOUND — nothing sent, nothing
      * recorded — for a [nodeId] with no row or no [org.lattice.data.peer.PeerEntity.phoneNumber] attached;
-     * that can't happen for a real SMS-pinned peer (see [SmsTransport]'s class doc), but a caller passing
-     * a mesh-only nodeId by mistake should get a clear "nothing to accept" rather than a silent no-op that
-     * looks like success.
+     * see [AcceptResult]'s doc for why that's kept distinct from SEND_FAILED.
      */
-    suspend fun accept(nodeId: String): Boolean {
-        val number = peers.find(nodeId)?.phoneNumber ?: return false
-        if (!sendOwnProfile(number)) return false
+    suspend fun accept(nodeId: String): AcceptResult {
+        val number = peers.find(nodeId)?.phoneNumber ?: return AcceptResult.NOT_FOUND
+        if (!sendOwnProfile(number)) return AcceptResult.SEND_FAILED
         peers.setProfileSentAt(nodeId, clock())
-        return true
+        return AcceptResult.ACCEPTED
     }
 
     private suspend fun sendOwnProfile(phoneNumber: String): Boolean = transport.sendRaw(phoneNumber, ownProfile.signed())

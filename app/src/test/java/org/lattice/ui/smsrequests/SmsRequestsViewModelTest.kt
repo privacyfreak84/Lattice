@@ -21,6 +21,7 @@ import org.junit.Test
 import org.lattice.data.PeerRepository
 import org.lattice.data.peer.PeerEntity
 import org.lattice.data.settings.SettingsStore
+import org.lattice.mesh.sms.AcceptResult
 import org.lattice.mesh.sms.InitiateResult
 import org.lattice.mesh.sms.SmsBootstrap
 
@@ -100,10 +101,62 @@ class SmsRequestsViewModelTest {
     @Test
     fun `accept delegates to SmsBootstrap`() =
         runTest {
+            coEvery { bootstrap.accept("bob") } returns AcceptResult.ACCEPTED
+
             vm().accept("bob")
             advanceUntilIdle()
 
             coVerify(exactly = 1) { bootstrap.accept("bob") }
+        }
+
+    @Test
+    fun `accept leaves acceptResult null on ACCEPTED -- the row disappearing is the only feedback`() =
+        runTest {
+            coEvery { bootstrap.accept("bob") } returns AcceptResult.ACCEPTED
+            val vm = vm()
+
+            vm.accept("bob")
+            advanceUntilIdle()
+
+            assertEquals(null, vm.acceptResult.value)
+        }
+
+    @Test
+    fun `accept maps NOT_FOUND through to acceptResult, distinctly from SEND_FAILED`() =
+        runTest {
+            coEvery { bootstrap.accept("stranger") } returns AcceptResult.NOT_FOUND
+            val vm = vm()
+
+            vm.accept("stranger")
+            advanceUntilIdle()
+
+            assertEquals(SmsAcceptResult.NOT_FOUND, vm.acceptResult.value)
+        }
+
+    @Test
+    fun `accept maps SEND_FAILED through to acceptResult`() =
+        runTest {
+            coEvery { bootstrap.accept("bob") } returns AcceptResult.SEND_FAILED
+            val vm = vm()
+
+            vm.accept("bob")
+            advanceUntilIdle()
+
+            assertEquals(SmsAcceptResult.SEND_FAILED, vm.acceptResult.value)
+        }
+
+    @Test
+    fun `consumeAcceptResult clears the one-shot result`() =
+        runTest {
+            coEvery { bootstrap.accept("bob") } returns AcceptResult.SEND_FAILED
+            val vm = vm()
+            vm.accept("bob")
+            advanceUntilIdle()
+            assertEquals(SmsAcceptResult.SEND_FAILED, vm.acceptResult.value)
+
+            vm.consumeAcceptResult()
+
+            assertEquals(null, vm.acceptResult.value)
         }
 
     @Test
