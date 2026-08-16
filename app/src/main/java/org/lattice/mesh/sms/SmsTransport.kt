@@ -254,8 +254,21 @@ class SmsTransport(
         // exactly how Bluetooth/Wi-Fi Aware already trust a self-asserted senderId. This transport adds
         // no new trust; it just stops gating receipt on a number it can't yet know.
         val fromNodeId = envelope.senderId
-        maybeRecordPendingPhoneNumber(fromNodeId, envelope.type, envelope.payload, sender)
-        scope.launch { _inbound.emit(InboundFrame(wire, envelope, fromNodeId)) }
+        // Sequenced in one coroutine, not raced across two: maybeRecordPendingPhoneNumber's peers.find()
+        // check must complete before the emit below reaches InboundPipeline.handleProfile, which pins the
+        // peer row. Launching these as two independent coroutines (the original shape here) raced this
+        // check against its own downstream effect -- if handleProfile won, peers.find(fromNodeId) would
+        // find the row it had *just* created and skip recording the pending number, so the peer got pinned
+        // correctly but its phone number silently never attached (confirmed on a real device: a
+        // successfully decoded, correctly-signed profile frame arrived, but nothing showed up in
+        // observePendingSmsRequests(), which requires phoneNumber IS NOT NULL). Sequencing removes the
+        // self-race; a peer already pinned from *before* this frame arrived (mesh sighting, an earlier
+        // message) is unaffected -- that's the intentional "already-known fromNodeId" no-op below, not
+        // the bug this fixes.
+        scope.launch {
+            maybeRecordPendingPhoneNumber(fromNodeId, envelope.type, envelope.payload, sender)
+            _inbound.emit(InboundFrame(wire, envelope, fromNodeId))
+        }
     }
 
     /**
@@ -265,9 +278,11 @@ class SmsTransport(
      * [sender]'s normalized number so [start]'s collector can attach it the moment that row is pinned.
      * Deliberately does nothing for an already-known [fromNodeId] (see [pendingPhoneNumberFor]'s
      * doc for why re-attaching to an existing row would be wrong) or a sender address that fails to
-     * normalize (alphanumeric sender ID, malformed — can never be a real callback number anyway).
+     * normalize (alphanumeric sender ID, malformed — can never be a real callback number anyway). Must be
+     * called (and awaited) strictly before the same frame reaches `InboundPipeline.handleProfile`
+     * downstream — see the race-condition comment at this method's call site in [onSmsReceived].
      */
-    private fun maybeRecordPendingPhoneNumber(
+    private suspend fun maybeRecordPendingPhoneNumber(
         fromNodeId: String,
         type: String,
         payload: ByteArray,
@@ -277,9 +292,7 @@ class SmsTransport(
         val pubKey = WireCodec.decodePayload<ProfileContent>(payload)?.pubKey ?: return
         if (NodeId.fromPublicKeyBundle(pubKey) != fromNodeId) return
         val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion()) ?: return
-        scope.launch {
-            if (peers.find(fromNodeId) == null) recordPendingPhoneNumber(fromNodeId, normalizedSender)
-        }
+        if (peers.find(fromNodeId) == null) recordPendingPhoneNumber(fromNodeId, normalizedSender)
     }
 
     // SIM country as the default region for parsing national-format (no leading '+') numbers — both the
