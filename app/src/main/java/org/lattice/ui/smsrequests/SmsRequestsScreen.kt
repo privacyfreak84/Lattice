@@ -270,10 +270,13 @@ private fun SmsRequestRowItem(
             title = { Text(stringResource(R.string.message_requests_block_confirm_title)) },
             text = { Text(stringResource(R.string.message_requests_block_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = {
-                    onBlock()
-                    showBlockConfirm = false
-                }) {
+                TextButton(
+                    onClick = {
+                        onBlock()
+                        showBlockConfirm = false
+                    },
+                    modifier = Modifier.testTag("sms_request_block_confirm_${row.nodeId}"),
+                ) {
                     Text(
                         text = stringResource(R.string.message_requests_block),
                         color = MaterialTheme.colorScheme.error,
