@@ -147,7 +147,9 @@ class SmsTransport(
                         // the profile screen's Remove button) has nothing pending and this is a no-op —
                         // deliberately: re-attaching a number the user explicitly removed would override
                         // their choice, so this only ever fires for a brand-new row's first attachment.
-                        takePendingPhoneNumber(row.nodeId)?.let { pending ->
+                        val pending = takePendingPhoneNumber(row.nodeId)
+                        if (pending != null) {
+                            Log.d(TAG, "attaching pending $pending to newly-observed peer ${row.nodeId}")
                             scope.launch { peers.setPhoneNumber(row.nodeId, pending) }
                         }
                         return@forEach
@@ -237,16 +239,35 @@ class SmsTransport(
     ): Boolean = false
 
     private fun onSmsReceived(intent: Intent) {
-        val messages = getMessagesFromIntent(intent) ?: return
-        if (messages.isEmpty()) return
-        val sender = messages[0].originatingAddress ?: return
+        val messages = getMessagesFromIntent(intent)
+        if (messages == null || messages.isEmpty()) {
+            Log.w(TAG, "onSmsReceived: no SmsMessages in intent")
+            return
+        }
+        val sender = messages[0].originatingAddress
+        if (sender == null) {
+            Log.w(TAG, "onSmsReceived: null originatingAddress, dropping")
+            return
+        }
         // The framework batches a multipart message's segments into one delivery when they arrive together;
         // concatenating bodies in order reassembles the original base64 text. A segment that's late/out of a
         // separate broadcast is dropped here (see design notes' open questions) rather than partially decoded.
         val text = messages.joinToString(separator = "") { it.messageBody ?: "" }
-        val bytes = SmsWireCodec.decode(text) ?: return
-        val wire = WireCodec.decodeWire(bytes) ?: return
-        val envelope = WireCodec.decodeEnvelope(wire.signed) ?: return
+        val bytes = SmsWireCodec.decode(text)
+        if (bytes == null) {
+            Log.w(TAG, "onSmsReceived from $sender: SmsWireCodec.decode failed (${text.length} chars, ${messages.size} parts)")
+            return
+        }
+        val wire = WireCodec.decodeWire(bytes)
+        if (wire == null) {
+            Log.w(TAG, "onSmsReceived from $sender: WireCodec.decodeWire failed (${bytes.size} bytes)")
+            return
+        }
+        val envelope = WireCodec.decodeEnvelope(wire.signed)
+        if (envelope == null) {
+            Log.w(TAG, "onSmsReceived from $sender: WireCodec.decodeEnvelope failed")
+            return
+        }
         // The claimed sender, same as every other transport — NOT cross-checked against phoneNumberFor
         // (a first-contact PROFILE, by definition, comes from a sender we don't have a routing entry for
         // yet). Real authentication happens downstream in InboundPipeline.verifyInbound, which drops
@@ -254,6 +275,7 @@ class SmsTransport(
         // exactly how Bluetooth/Wi-Fi Aware already trust a self-asserted senderId. This transport adds
         // no new trust; it just stops gating receipt on a number it can't yet know.
         val fromNodeId = envelope.senderId
+        Log.d(TAG, "onSmsReceived from $sender: decoded ${envelope.type} ${envelope.id} claiming nodeId=$fromNodeId")
         // Sequenced in one coroutine, not raced across two: maybeRecordPendingPhoneNumber's peers.find()
         // check must complete before the emit below reaches InboundPipeline.handleProfile, which pins the
         // peer row. Launching these as two independent coroutines (the original shape here) raced this
@@ -288,11 +310,31 @@ class SmsTransport(
         payload: ByteArray,
         sender: String,
     ) {
-        if (type != FrameType.PROFILE) return
-        val pubKey = WireCodec.decodePayload<ProfileContent>(payload)?.pubKey ?: return
-        if (NodeId.fromPublicKeyBundle(pubKey) != fromNodeId) return
-        val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion()) ?: return
-        if (peers.find(fromNodeId) == null) recordPendingPhoneNumber(fromNodeId, normalizedSender)
+        if (type != FrameType.PROFILE) {
+            Log.d(TAG, "maybeRecordPendingPhoneNumber: $type from $fromNodeId is not a PROFILE, skipping")
+            return
+        }
+        val pubKey = WireCodec.decodePayload<ProfileContent>(payload)?.pubKey
+        if (pubKey == null) {
+            Log.w(TAG, "maybeRecordPendingPhoneNumber: PROFILE from $fromNodeId has no decodable pubKey")
+            return
+        }
+        val derived = NodeId.fromPublicKeyBundle(pubKey)
+        if (derived != fromNodeId) {
+            Log.w(TAG, "maybeRecordPendingPhoneNumber: self-cert mismatch, claimed=$fromNodeId derived=$derived")
+            return
+        }
+        val normalizedSender = PhoneNumberNormalizer.normalize(sender, defaultRegion())
+        if (normalizedSender == null) {
+            Log.w(TAG, "maybeRecordPendingPhoneNumber: sender '$sender' failed to normalize (region=${defaultRegion()})")
+            return
+        }
+        if (peers.find(fromNodeId) == null) {
+            Log.d(TAG, "maybeRecordPendingPhoneNumber: recording pending $normalizedSender for new peer $fromNodeId")
+            recordPendingPhoneNumber(fromNodeId, normalizedSender)
+        } else {
+            Log.d(TAG, "maybeRecordPendingPhoneNumber: $fromNodeId already has a peer row, not attaching a number")
+        }
     }
 
     // SIM country as the default region for parsing national-format (no leading '+') numbers — both the
